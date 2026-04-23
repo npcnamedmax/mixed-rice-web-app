@@ -1,4 +1,4 @@
-import { Relations, relations } from 'drizzle-orm';
+import { relations } from 'drizzle-orm';
 import {
   pgTable,
   text,
@@ -9,7 +9,6 @@ import {
   serial,
   uuid
 } from 'drizzle-orm/pg-core';
-import { createInsertSchema } from 'drizzle-zod';
 
 export const statusEnum = pgEnum('status', ['active', 'inactive', 'archived']);
 
@@ -26,7 +25,7 @@ export const products = pgTable('products', {
 export const food_items = pgTable('food_items', {
   id: serial('id').primaryKey(),
   name: text('name').notNull(),
-  classId: integer('class_id').notNull(),
+  classId: integer('class_id').unique().notNull(),
   imageUrl: text('img_url').notNull(),
   activePriceId: integer('active_price_id')
     .references(() => food_prices.id)
@@ -63,7 +62,8 @@ export const transactions = pgTable('transactions', {
   totalPrice: numeric('total_price', { precision: 10, scale: 2 }).notNull(),
   status: transactionStatus('status'),
   model_type: modelType('model_type'),
-  imgName: text('img_name').notNull()
+  imgName: text('img_name').notNull(),
+  jsonName: text('json_name').notNull()
 });
 export const transactionItemStatus = pgEnum('transaction_item_status', [
   'PREDICTED_ITEM',
@@ -80,7 +80,7 @@ export const transactionItems = pgTable('transaction_items', {
     .references(() => food_prices.id)
     .notNull(),
   foodId: integer('food_id').notNull(),
-  predictedMass: numeric('predicted_mass', {
+  totalMass: numeric('total_mass', {
     precision: 10,
     scale: 2
   }),
@@ -100,7 +100,7 @@ export const TransactionItemRelations = relations(
   ({ one }) => ({
     foodItem: one(food_items, {
       fields: [transactionItems.foodId],
-      references: [food_items.id]
+      references: [food_items.classId]
     }),
     foodPrice: one(food_prices, {
       fields: [transactionItems.foodPriceId],
@@ -150,9 +150,9 @@ export type InsertTransactionitems = RequiredExcept<
   RemoveNullAndUndefined<
     Pick<
       typeof transactionItems.$inferInsert,
-      'foodId' | 'predictedMass' | 'finalPrice' | 'itemStatus'
+      'foodId' | 'totalMass' | 'finalPrice' | 'itemStatus'
     >,
-    'predictedMass'
+    'totalMass'
   >,
-  'predictedMass'
+  'totalMass'
 >;

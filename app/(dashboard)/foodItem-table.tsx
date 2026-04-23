@@ -16,7 +16,7 @@ import {
   CardTitle
 } from '@/components/ui/card';
 import { foodItemType } from '@/lib/db';
-import { useRouter } from 'next/navigation';
+import { useRouter, usePathname } from 'next/navigation';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { FoodItem } from './foodItem';
@@ -33,6 +33,7 @@ export function FoodItemsTable({
   searchString?: string | null;
 }) {
   let router = useRouter();
+  const pathname = usePathname();
   let itemsPerPage = 5;
 
   function prevPage() {
@@ -45,7 +46,7 @@ export function FoodItemsTable({
     if (searchString) {
       params.set('q', searchString);
     }
-    router.push(`/?${params.toString()}`, { scroll: false });
+    router.push(`${pathname}?${params.toString()}`, { scroll: false });
   }
   const left =
     offset === 0

@@ -16,10 +16,11 @@ import {
   CardTitle
 } from '@/components/ui/card';
 import { TransactionType } from '@/lib/db';
-import { useRouter } from 'next/navigation';
+import { useRouter, usePathname } from 'next/navigation';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Transaction } from './transaction';
+import { useEffect } from 'react';
 
 export function TransactionsTable({
   transactions,
@@ -33,6 +34,7 @@ export function TransactionsTable({
   // searchString?: string | null; change to filtering
 }) {
   let router = useRouter();
+  const pathname = usePathname();
   let itemsPerPage = 5;
 
   function prevPage() {
@@ -45,8 +47,9 @@ export function TransactionsTable({
     /* if (searchString) {
       params.set('q', searchString);
     } */
-    router.push(`/?${params.toString()}`, { scroll: false });
+    router.push(`${pathname}?${params.toString()}`, { scroll: false });
   }
+  useEffect(() => console.log(offset, itemsPerPage));
   const left =
     offset === 0
       ? totalItems - (totalItems % itemsPerPage) + 1
@@ -71,8 +74,8 @@ export function TransactionsTable({
             </TableRow>
           </TableHeader>
           <TableBody>
-            {transactions.map((t) => (
-              <Transaction transactionItem={t} />
+            {transactions.map((t, i) => (
+              <Transaction key={i} transactionItem={t} />
             ))}
           </TableBody>
         </Table>
@@ -92,7 +95,7 @@ export function TransactionsTable({
               variant="ghost"
               size="sm"
               type="submit"
-              disabled={offset === itemsPerPage}
+              disabled={offset < itemsPerPage}
             >
               <ChevronLeft className="mr-2 h-4 w-4" />
               Prev

@@ -8,7 +8,10 @@ import { dbRunner } from '@/lib/dbClient';
 
 import { createClient } from '@supabase/supabase-js';
 import axios, { AxiosError } from 'axios';
-import { TransactionItemView } from '../app/(dashboard)/inference/inference-module';
+import {
+  GroupItemView,
+  TransactionItemView
+} from '../app/(dashboard)/inference/inference-module';
 import { ModelEnumType } from '@/lib/schema';
 
 export type PredResponseType = {
@@ -50,76 +53,78 @@ export const getPrediction = async (
 
   console.log(data);
   try {
-    var res = await axios.post<PredResponseType[]>(
+    const res = await axios.post<PredResponseType[]>(
       'http://localhost:8000/inference',
       {
         imgUrl: `${linkPref}/${data.fullPath}`,
         model: selectedModel
       }
     );
-    console.log(res.data);
+    if (!res.data) throw new Error('No response data');
+    const { error: JSONError } = await supabase.storage
+      .from(bucketName)
+      .upload(`tmp/${fileName.split('.')[0]}.json`, JSON.stringify(res.data), {
+        cacheControl: '3600',
+        upsert: true
+      });
+    if (JSONError) throw JSONError;
+
+    const parsedData: PredResponseType[] =
+      typeof res.data === 'string' ? JSON.parse(res.data) : res.data;
+
+    console.log(parsedData);
+
+    const clsArr = parsedData.map((i: PredResponseType) => Number(i.class));
+    const { foodItems } = await dbRunner((db) =>
+      getFoodItemsViaClsId(db, clsArr)
+    );
+    const foodMap = new Map(foodItems.map((i) => [i.classId, i]));
+    const isAgnostic =
+      selectedModel === 'YOLOv11_CA' ||
+      selectedModel === 'YOLOv12_CA' ||
+      selectedModel === 'RT-DETR_CA';
+    const ret: TransactionItemView[] = parsedData
+      .map((i) => {
+        const foodEntry = foodMap.get(i.class);
+        if (!foodEntry) return null;
+
+        const predictedMass = isAgnostic
+          ? (i.mass[0] ?? 0)
+          : (i.mass[i.class] ?? 0);
+
+        const stepPrice = Number(foodEntry.foodPrices.stepPrice);
+        const priceInterval = Number(foodEntry.foodPrices.priceInterval);
+
+        const massRatio = Math.ceil(predictedMass / priceInterval);
+        const finalPriceStr = (massRatio * stepPrice).toFixed(2);
+
+        return {
+          finalPrice: finalPriceStr,
+          activePriceId: foodEntry.activePriceId,
+          stepPrice: foodEntry.foodPrices.stepPrice,
+          priceInterval: Number(foodEntry.foodPrices.priceInterval),
+          foodId: i.class,
+          itemStatus: 'PREDICTED_ITEM' as const,
+          predInfo: i,
+          isAgnostic: isAgnostic,
+          name: foodEntry.name
+        } as TransactionItemView;
+      })
+      .filter((item): item is TransactionItemView => item !== null);
+
+    return ret;
   } catch (err: any) {
-    console.dir(err.response.data, { depth: null });
+    if (err instanceof AxiosError) {
+      console.dir(err.response?.data, { depth: null });
+    } else {
+      console.error('Prediction request failed:', err);
+    }
     return null;
   }
-  /* const { error: JSONError } = await supabase.storage
-    .from('prediction_info')
-    .upload(`${linkPref}/${bucketName}/${fileName}.json`, res.data, {
-      cacheControl: '3600',
-      upsert: true
-    });
-  if (JSONError) throw JSONError; */
-  if (!res.data) return null;
-
-  const parsedData: PredResponseType[] =
-    typeof res.data === 'string' ? JSON.parse(res.data) : res.data;
-
-  console.log(parsedData);
-
-  const clsArr = parsedData.map((i: PredResponseType) => Number(i.class));
-  const { foodItems } = await dbRunner((db) =>
-    getFoodItemsViaClsId(db, clsArr)
-  );
-  const foodMap = new Map(foodItems.map((i) => [i.classId, i]));
-  const isAgnostic =
-    selectedModel === 'YOLOv11_CA' ||
-    selectedModel === 'YOLOv12_CA' ||
-    selectedModel === 'RT-DETR_CA';
-  const ret: TransactionItemView[] = parsedData
-    .map((i) => {
-      const foodEntry = foodMap.get(i.class);
-      if (!foodEntry) return null;
-
-      const massIndex = isAgnostic ? 0 : i.class;
-      const predictedMass =
-        i.mass && i.mass[massIndex] ? Number(i.mass[massIndex]) : 0;
-
-      const stepPrice = Number(foodEntry.foodPrices.stepPrice);
-      const priceInterval = Number(foodEntry.foodPrices.priceInterval);
-
-      const massRatio = Math.ceil(predictedMass / priceInterval);
-      const finalPriceStr = (massRatio * stepPrice).toFixed(2);
-
-      return {
-        finalPrice: finalPriceStr,
-        activePriceId: foodEntry.activePriceId,
-        stepPrice: foodEntry.foodPrices.stepPrice,
-        priceInterval: Number(foodEntry.foodPrices.priceInterval),
-        foodId: i.class,
-        itemStatus: 'PREDICTED_ITEM' as const,
-        predInfo: i,
-        isAgnostic: isAgnostic,
-        selectedMassIndex: massIndex,
-        name: foodEntry.name
-      } as TransactionItemView;
-    })
-    .filter((item): item is TransactionItemView => item !== null);
-
-  return ret;
 };
 
 export const saveTransactionToDb = async (
-  items: any[],
+  items: GroupItemView[],
   fileName: string,
   model: ModelEnumType
 ) => {
@@ -136,14 +141,18 @@ export const saveTransactionToDb = async (
   );
   const bucketName = 'prediction_info';
 
+  const jsonFileName = `${fileName.split('.')[0]}.json`;
   // Move file first
-  const { error: storageError } = await supabase.storage
-    .from(bucketName)
-    .move(`tmp/${fileName}`, `transacted/${fileName}`);
-
-  if (storageError) {
-    console.error('Failed to move file', storageError);
-    throw storageError;
+  try {
+    await supabase.storage
+      .from(bucketName)
+      .move(`tmp/${fileName}`, `transacted/${fileName}`);
+    await supabase.storage
+      .from(bucketName)
+      .move(`tmp/${jsonFileName}`, `transacted/${jsonFileName}`);
+  } catch (err) {
+    console.error('Failed to move file', err);
+    throw err;
   }
 
   const totalPrice = items.reduce(
@@ -156,7 +165,8 @@ export const saveTransactionToDb = async (
       totalPrice: totalPrice.toFixed(2),
       model_type: model,
       status: 'APPROVED',
-      imgName: fileName
+      imgName: fileName,
+      jsonName: jsonFileName
     })
   );
 
@@ -165,18 +175,18 @@ export const saveTransactionToDb = async (
     throw dbError || new Error('Failed to insert transaction');
   }
 
-  const transactionItemsData = items.map((i: any) => {
-    console.log('ActivePriceId', i.activePriceId);
+  const transactionItemsData = items.map((i) => {
+    //console.log('ActivePriceId', i.activePriceId);
     return {
       transactionId: transactionData.id,
       foodId: i.foodId,
       foodPriceId: i.activePriceId,
       finalPrice: String(i.finalPrice),
-      predictedMass: i.totalMass ? String(i.totalMass) : null,
-      itemStatus: i.itemStatus || 'PREDICTED_ITEM'
+      totalMass: i.totalMass ? String(i.totalMass) : null,
+      itemStatus: i.itemStatus
     };
   });
-
+  console.log(transactionItemsData);
   const { error: dbItemError } = await dbRunner((db) =>
     insertTransactionItems(db, transactionItemsData)
   );

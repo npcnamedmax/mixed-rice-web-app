@@ -2,60 +2,40 @@
 
 import Image from 'next/image';
 import React, { useRef, useState } from 'react';
-import { Dialog, DialogContent } from '../../../components/ui/dialog';
+import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { foodItemType } from '@/lib/db';
 import { getMoreFoodItems } from '@/actions/foodActions';
-import { Field, FieldGroup } from '../../../components/ui/field';
-import { Label } from '../../../components/ui/label';
-import { Input } from '../../../components/ui/input';
+import { Field, FieldGroup } from '@/components/ui/field';
+import { Label } from '@/components/ui/label';
+import { Input } from '@/components/ui/input';
 import {
   Combobox,
   ComboboxContent,
   ComboboxEmpty,
   ComboboxInput,
   ComboboxItem,
-  ComboboxList
-} from '../../../components/ui/combobox';
+  ComboboxList,
+  ComboboxTrigger,
+  ComboboxValue
+} from '@/components/ui/combobox';
 import {
   Item,
   ItemContent,
   ItemDescription,
   ItemTitle
-} from '../../../components/ui/item';
-import { Button } from '../../../components/ui/button';
+} from '@/components/ui/item';
+import { Button } from '@/components/ui/button';
 import { TransactionItemView } from './inference-module';
-export type Labels = {
-  //normalized coords
-  x1_coord: number;
-  y1_coord: number;
-  width: number; //px
-  height: number; //px
-  className: string;
-};
+import { Loader } from 'lucide-react';
 
-export const dummyLabels: Labels[] = [
-  {
-    x1_coord: 0.15, // 15% from the left
-    y1_coord: 0.3, // 30% from the top
-    width: 250, // 250px wide
-    height: 180, // 180px tall
-    className: 'Cheeseburger'
-  },
-  {
-    x1_coord: 0.65, // 65% from the left
-    y1_coord: 0.5, // 50% from the top
-    width: 120, // 120px wide
-    height: 150, // 150px tall
-    className: 'French Fries'
-  },
-  {
-    x1_coord: 0.75, // 75% from the left
-    y1_coord: 0.1, // 10% from the top
-    width: 80, // 80px wide
-    height: 200, // 200px tall
-    className: 'Soda Cola'
-  }
-];
+type ComboboxItemType = {
+  name: string;
+  classId: number;
+  finalPrice: number;
+  priceInterval: number;
+  stepPrice: number;
+  activePriceId: number;
+};
 
 export function FoodAnnotation({
   foodSrc,
@@ -63,28 +43,29 @@ export function FoodAnnotation({
   isAgnostic,
   initFoodItems,
   initNewOffset,
+  isPredicting,
   changeFoodItem
 }: {
   foodSrc: string;
   labels: TransactionItemView[];
-  isAgnostic: boolean;
+  isAgnostic: boolean | null;
   initFoodItems: foodItemType[];
   initNewOffset: number | null;
-  changeFoodItem: (idx: number, updated: Partial<TransactionItemView>) => void;
+  isPredicting: boolean;
+  changeFoodItem: (
+    idx: number,
+    item: {
+      name: string;
+      classId: number;
+      finalPrice: number;
+      priceInterval: number;
+      stepPrice: number;
+      activePriceId: number;
+    }
+  ) => void;
 }) {
-  const [currentSelectedIndex, setCurrentSelectedIndex] = useState<
-    number | null
-  >(null);
-  const currentSelectedItem =
-    currentSelectedIndex !== null ? labels[currentSelectedIndex] : null; //got bug? need to chg to getter?
-  const [stagedItem, setStagedItem] = useState<{
-    foodId: number;
-    selectedMassIndex: number;
-    name: string;
-    stepPrice: string;
-    priceInterval: number;
-    activePriceId: number;
-  } | null>(null);
+  const [selectedIdx, setSelectedIdx] = useState<number | null>(null);
+  const [stagedItem, setStagedItem] = useState<ComboboxItemType | null>(null);
 
   const [foodItems, setFoodItems] = useState<foodItemType[]>(initFoodItems);
   const [newOffset, setOffset] = useState<number | null>(initNewOffset);
@@ -111,90 +92,48 @@ export function FoodAnnotation({
     }
   };
 
-  const chgFoodItem = () => {
-    if (currentSelectedIndex === null || currentSelectedItem === null) return;
-    const newPrice = inputRef.current?.value ?? currentSelectedItem.finalPrice;
-
-    const finalMassIndex = stagedItem
-      ? stagedItem.selectedMassIndex
-      : currentSelectedItem.selectedMassIndex;
-    const finalInterval = stagedItem
-      ? stagedItem.priceInterval
-      : currentSelectedItem.priceInterval;
-    const finalStep = stagedItem
-      ? Number(stagedItem.stepPrice)
-      : Number(currentSelectedItem.stepPrice);
-    const finalMass = currentSelectedItem.predInfo?.mass[finalMassIndex] || 0;
-    const expectedBaselinePrice = (
-      Math.ceil(finalMass / finalInterval) * finalStep
-    ).toFixed(2);
-
-    // Tag the override securely!
-    const isOverride = Number(newPrice).toFixed(2) !== expectedBaselinePrice;
-
-    if (stagedItem) {
-      changeFoodItem(currentSelectedIndex, {
-        ...stagedItem,
-        finalPrice: newPrice,
-        isManualOverride: isOverride
-      });
-    } else {
-      changeFoodItem(currentSelectedIndex, {
-        selectedMassIndex: currentSelectedItem.selectedMassIndex,
-        finalPrice: newPrice,
-        activePriceId: currentSelectedItem.activePriceId,
-        isManualOverride: isOverride
-      });
-    }
-    setCurrentSelectedIndex(null);
-    setStagedItem(null);
+  const setCurrentIdx = (idx: number | null) => {
+    setSelectedIdx(idx);
+    setStagedItem(
+      idx !== null
+        ? {
+            name: labels[idx].name,
+            classId: labels[idx].foodId,
+            finalPrice: Number(labels[idx].finalPrice),
+            priceInterval: Number(labels[idx].priceInterval ?? 0),
+            stepPrice: Number(labels[idx].stepPrice ?? 0),
+            activePriceId: Number(labels[idx].activePriceId ?? 0)
+          }
+        : null
+    );
   };
 
-  if (isAgnostic) {
-    return (
-      <div className="relative w-full h-full">
-        {labels.map(
-          (i, idx) =>
-            i.predInfo && (
-              <React.Fragment key={idx}>
-                <div
-                  className={`absolute bg-amber-50 z-10 text-sm text-black`}
-                  style={{
-                    left: `${i.predInfo.box.x1}`,
-                    top: `${i.predInfo.box.y1}`
-                  }}
-                >
-                  {i.name}
-                </div>
-                <div
-                  className={`absolute border-2 border-amber-50 z-10`}
-                  style={{
-                    left: `${i.predInfo.box.x1}`,
-                    top: `${i.predInfo.box.y1}`,
-                    width: `${i.predInfo.box.x2 - i.predInfo.box.x1}`,
-                    height: `${i.predInfo.box.y2 - i.predInfo.box.y1}`
-                  }}
-                ></div>
-              </React.Fragment>
-            )
-        )}
-        <Image
-          src={foodSrc}
-          fill
-          alt="foodImg"
-          className="object-contain z-0"
-        />
-      </div>
-    );
-  }
+  const chgFoodItem = () => {
+    if (!stagedItem || selectedIdx === null) return;
+    const currentSelectedItem = labels[selectedIdx];
+    const newPrice = inputRef.current?.value;
+    if (!newPrice || !currentSelectedItem) return;
+
+    changeFoodItem(selectedIdx, {
+      name: stagedItem.name,
+      classId: stagedItem.classId,
+      finalPrice: Number(newPrice),
+      priceInterval: stagedItem.priceInterval,
+      stepPrice: stagedItem.stepPrice,
+      activePriceId: stagedItem.activePriceId
+    });
+    setCurrentIdx(null);
+  };
+
   return (
     <div className="relative" style={{ width: '640px', height: '640px' }}>
       {labels.map(
         (i, idx) =>
-          i.predInfo && (
+          i.predInfo &&
+          i.itemStatus !== 'VENDOR_REMOVED' && (
             <Button
               key={idx}
-              onClick={() => setCurrentSelectedIndex(idx)}
+              onClick={() => setCurrentIdx(idx)}
               className="absolute z-10 border-2 border-amber-50 bg-transparent p-0 cursor-pointer hover:bg-amber-50/20"
               style={{
                 left: `${i.predInfo.box.x1}px`,
@@ -212,29 +151,86 @@ export function FoodAnnotation({
           )
       )}
       <Image src={foodSrc} fill alt="foodImg" className="object-contain z-0" />
+      {isPredicting && (
+        <div className="absolute inset-0 z-20 flex items-center justify-center pointer-events-none bg-gray-500/50 backdrop-blur-sm">
+          <Loader />
+        </div>
+      )}
       <Dialog
-        open={!!currentSelectedItem}
+        open={!!stagedItem}
         onOpenChange={(open) => {
           if (!open) {
-            setCurrentSelectedIndex(null);
-            setStagedItem(null);
+            setCurrentIdx(null);
           }
         }}
       >
         <DialogContent className="sm:max-w-3xl w-[95vw]">
           <div className="flex flex-col gap-4 py-4">
             <div className="font-semibold text-lg">
-              Edit: {stagedItem ? stagedItem.name : currentSelectedItem?.name}
+              Edit: {stagedItem?.name}
             </div>
             <FieldGroup className="py-6">
               <Field>
                 <Label>Select Food Class</Label>
                 <Combobox
-                  items={foodItems}
-                  itemToStringValue={(i: (typeof foodItems)[number]) => i.name}
+                  items={foodItems.map<ComboboxItemType>((i) => {
+                    const massVal =
+                      selectedIdx !== null &&
+                      labels[selectedIdx]?.predInfo?.mass
+                        ? Number(
+                            labels[selectedIdx].predInfo.mass[
+                              isAgnostic ? 0 : i.classId
+                            ] ?? 0
+                          )
+                        : 0;
+
+                    const interval = i.foodPrices.priceInterval;
+                    const step = i.foodPrices.stepPrice;
+
+                    const calculatedPrice = (
+                      Math.ceil(massVal / interval) * Number(step)
+                    ).toFixed(2);
+
+                    return {
+                      name: i.name,
+                      finalPrice: Number(calculatedPrice),
+                      classId: i.classId,
+                      activePriceId: i.activePriceId,
+                      priceInterval: interval,
+                      stepPrice: Number(step)
+                    };
+                  })}
+                  itemToStringLabel={(i: ComboboxItemType | null) =>
+                    i?.name
+                      ? i.name.charAt(0).toUpperCase() + i.name.slice(1)
+                      : ''
+                  }
+                  value={stagedItem}
+                  onValueChange={(i) => {
+                    if (!i) return;
+                    setStagedItem(i);
+                    if (inputRef.current) {
+                      inputRef.current.value = i.finalPrice.toFixed(2);
+                    }
+                  }}
+                  disabled={!!isAgnostic}
                 >
-                  <ComboboxInput readOnly />
+                  <ComboboxTrigger
+                    render={
+                      <Button
+                        variant="outline"
+                        className="w-64 justify-between font-normal"
+                      >
+                        <ComboboxValue />
+                      </Button>
+                    }
+                  />
                   <ComboboxContent>
+                    <ComboboxInput
+                      showTrigger={false}
+                      value={''}
+                      className="hidden"
+                    />
                     <ComboboxList
                       onScroll={(e) => {
                         const target = e.currentTarget;
@@ -249,39 +245,25 @@ export function FoodAnnotation({
                       {(i: any, idx: number) => (
                         <ComboboxItem
                           key={idx}
-                          value={i.name}
-                          onClick={() => {
-                            setStagedItem({
-                              foodId: i.classId,
-                              selectedMassIndex: i.classId,
-                              name: i.name,
-                              stepPrice: i.foodPrices.stepPrice,
-                              priceInterval: i.foodPrices.priceInterval,
-                              activePriceId: i.activePriceId
-                            });
-                            // Compute realtime simulated checkout value dynamically.
-                            const massVal =
-                              currentSelectedItem?.predInfo?.mass[i.classId] ||
-                              0;
-                            const simulatedBaseline = (
-                              Math.ceil(massVal / i.foodPrices.priceInterval) *
-                              Number(i.foodPrices.stepPrice)
-                            ).toFixed(2);
-                            if (inputRef.current) {
-                              inputRef.current.value = simulatedBaseline;
-                            }
-                          }}
+                          value={i}
+                          style={
+                            stagedItem && stagedItem.classId === i.classId
+                              ? { backgroundColor: '#95b4dfff' }
+                              : {}
+                          }
                         >
                           <Item size="xs" className="p-0">
                             <ItemContent>
                               <ItemTitle className="whitespace-nowrap">
-                                {i.name}
+                                {i.name.charAt(0).toUpperCase() +
+                                  i.name.slice(1)}
                               </ItemTitle>
                               <ItemDescription>
-                                {currentSelectedItem?.predInfo?.mass[
-                                  i.classId
-                                ] != null
-                                  ? `${currentSelectedItem.predInfo.mass[i.classId]}g`
+                                {selectedIdx !== null &&
+                                labels[selectedIdx].predInfo?.mass?.[
+                                  isAgnostic ? 0 : i.classId
+                                ]
+                                  ? `${labels[selectedIdx].predInfo.mass[isAgnostic ? 0 : i.classId]}g`
                                   : '-'}
                               </ItemDescription>
                             </ItemContent>
@@ -301,16 +283,20 @@ export function FoodAnnotation({
               <Field>
                 <Label htmlFor="finalPrice">
                   Price{' '}
-                  {currentSelectedItem?.predInfo?.mass
-                    ? `(mass: ${currentSelectedItem.predInfo.mass[stagedItem ? stagedItem.selectedMassIndex : currentSelectedItem.selectedMassIndex]}g)`
+                  {stagedItem &&
+                  selectedIdx !== null &&
+                  labels[selectedIdx].predInfo?.mass?.[
+                    isAgnostic ? 0 : stagedItem.classId
+                  ]
+                    ? `(mass: ${labels[selectedIdx].predInfo.mass[isAgnostic ? 0 : stagedItem.classId]}g)`
                     : ''}
                 </Label>
                 <Input
                   id="finalPrice"
                   name="finalPrice"
                   ref={inputRef}
-                  defaultValue={currentSelectedItem?.finalPrice}
-                  key={currentSelectedIndex}
+                  key={selectedIdx}
+                  defaultValue={stagedItem?.finalPrice}
                 />
               </Field>
             </FieldGroup>
@@ -318,8 +304,7 @@ export function FoodAnnotation({
               <Button
                 variant="outline"
                 onClick={() => {
-                  setCurrentSelectedIndex(null);
-                  setStagedItem(null);
+                  setCurrentIdx(null);
                 }}
               >
                 Cancel

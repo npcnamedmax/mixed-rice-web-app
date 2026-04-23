@@ -11,7 +11,7 @@ import {
   TableCell,
   Table
 } from '@/components/ui/table';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { InsertTransactionitems, ModelEnumType, modelType } from '@/lib/schema';
 import { Button } from '@/components/ui/button';
 import { PlusCircle, Trash2, Camera, Upload } from 'lucide-react';
@@ -36,20 +36,26 @@ import { FoodAnnotation } from './foodAnnotation';
 
 export const dynamic = 'force-dynamic';
 
-export type TransactionItemView = Omit<
-  InsertTransactionitems,
-  'predictedMass'
-> & {
-  selectedMassIndex: number;
+export type TransactionItemView = Omit<InsertTransactionitems, 'totalMass'> & {
   activePriceId: number;
-  isAgnostic?: boolean | undefined;
+  isAgnostic: boolean | null;
   name: string;
   finalPrice: string;
+  predInfo?: PredResponseType | undefined;
   stepPrice: string;
   priceInterval: number;
-  predInfo?: PredResponseType | undefined;
-  isManualOverride?: boolean;
 }; //mass follows cls id and can be chged
+
+export type GroupItemView = {
+  foodId: number;
+  name: string;
+  finalPrice: number;
+  itemStatus: TransactionItemView['itemStatus'];
+  stepPrice: number;
+  priceInterval: number;
+  totalMass: number | null;
+  activePriceId: number;
+};
 
 export default function InferenceModule({
   initialFoodItems,
@@ -63,15 +69,20 @@ export default function InferenceModule({
   const [afterReset, setAfterReset] = useState(false);
   const [isPredicting, setIsPredicting] = useState(false);
   const [fileName, setFileName] = useState<string | null>(null);
+  const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [selectedModel, chgModel] = useState<ModelEnumType>(
     modelType.enumValues[0]
   );
-  const [{ files }, { openFileDialog, getInputProps }] = useFileUpload({
-    accept: '.jpg,.jpeg,.png',
-    multiple: false,
-    maxFiles: 1,
-    maxSize: 49e6 //49mb
-  });
+  const [priceOverride, setPriceOverride] = useState<Record<number, number>>(
+    {}
+  );
+  const [{ files }, { openFileDialog, getInputProps, clearFiles }] =
+    useFileUpload({
+      accept: '.jpg,.jpeg,.png',
+      multiple: false,
+      maxFiles: 1,
+      maxSize: 49e6 //49mb
+    });
 
   const addItem = (f: TransactionItemView) => {
     //itemStatus set in dialog
@@ -85,16 +96,41 @@ export default function InferenceModule({
       }
       return [...prev, f];
     });
+    setIsAddModalOpen(false);
+  };
+
+  const handlePriceOverride = (foodId: number, newPrice: number) => {
+    setPriceOverride((prev) => ({ ...prev, [foodId]: newPrice }));
   };
 
   const changeFoodItem = (
     idx: number,
-    updated: Partial<TransactionItemView>
+    updated: {
+      name: string;
+      classId: number;
+      finalPrice: number;
+      priceInterval: number;
+      stepPrice: number;
+      activePriceId: number;
+    }
   ) => {
     chgItems((prev) => {
       const newItems = [...prev];
-      newItems[idx] = { ...newItems[idx], ...updated };
+      newItems[idx] = {
+        ...newItems[idx],
+        foodId: updated.classId,
+        finalPrice: updated.finalPrice.toString(),
+        activePriceId: updated.activePriceId,
+        stepPrice: updated.stepPrice.toString(),
+        priceInterval: updated.priceInterval,
+        name: updated.name
+      };
       return newItems;
+    });
+    setPriceOverride((prev) => {
+      const newOverrides = { ...prev };
+      delete newOverrides[updated.classId];
+      return newOverrides;
     });
   };
 
@@ -102,9 +138,11 @@ export default function InferenceModule({
     if (!afterReset) reset();
     //get pred
     const file = files[0].file;
-    const fileName = `${uuidv4()}.${file.name.split('.').pop()}`;
+
     const formData = new FormData();
+    let fileName = '';
     if (file instanceof File) {
+      fileName = `${uuidv4()}.${file.name.split('.').pop()}`;
       formData.append('file', file);
     } else {
       console.error('The uploaded item is not a valid File object');
@@ -135,13 +173,28 @@ export default function InferenceModule({
     chgItems([]);
     setFileName(null);
     setAfterReset(true);
+    setPriceOverride({});
   };
 
+  const currentFile = files[0]?.file;
+  const [objectUrl, setObjectUrl] = useState<string | null>(null);
+
   useEffect(() => {
-    if (files.length > 0) {
-      reset();
+    if (currentFile && currentFile instanceof File) {
+      const url = URL.createObjectURL(currentFile);
+      setObjectUrl(url);
+      return () => {
+        URL.revokeObjectURL(url);
+      };
     }
-  }, [files[0]?.file]);
+    setObjectUrl(null);
+  }, [currentFile]);
+
+  useEffect(() => {
+    return () => {
+      if (objectUrl) URL.revokeObjectURL(objectUrl);
+    };
+  }, [objectUrl]);
 
   const removeClassGroup = (foodId: number) => {
     chgItems((prev) =>
@@ -157,53 +210,52 @@ export default function InferenceModule({
     (t) => t.itemStatus !== 'VENDOR_REMOVED'
   );
 
-  const groupedItems = Object.values(
+  const groupedItems: GroupItemView[] = Object.values(
     activeItems.reduce(
       (acc, item) => {
         //group same cls tgt to get total mass n price
+        let totalMass = null;
+        if (item.predInfo) {
+          if (item.isAgnostic) totalMass = item.predInfo.mass[0];
+          else totalMass = item.predInfo.mass[item.foodId];
+        }
         if (!acc[item.foodId]) {
           acc[item.foodId] = {
             foodId: item.foodId,
             name: item.name,
             stepPrice: Number(item.stepPrice),
             priceInterval: Number(item.priceInterval),
-            totalMass: 0,
-            manualPriceSum: 0,
-            activePriceId: item.activePriceId
+            totalMass,
+            activePriceId: item.activePriceId,
+            itemStatus: item.itemStatus,
+            finalPrice: Number(item.finalPrice)
           };
-        }
-
-        if (item.itemStatus === 'PREDICTED_ITEM' && item.predInfo?.mass) {
-          if (item.isManualOverride) {
-            //get price based on manual input
-            acc[item.foodId].manualPriceSum += Number(item.finalPrice);
-          } else {
-            //get price based on mass
-            acc[item.foodId].totalMass += Number(
-              item.predInfo.mass[item.selectedMassIndex]
-            );
+        } else {
+          if (item.predInfo) {
+            if (acc[item.foodId].totalMass === null) {
+              acc[item.foodId].totalMass = 0;
+            }
+            if (item.isAgnostic)
+              acc[item.foodId].totalMass += Number(item.predInfo?.mass[0] ?? 0);
+            else
+              acc[item.foodId].totalMass += Number(
+                item.predInfo?.mass[item.foodId] ?? 0
+              );
           }
-        } else if (item.itemStatus === 'VENDOR_ADDED') {
-          //get price based on manual input
-          acc[item.foodId].manualPriceSum += Number(item.finalPrice);
+          acc[item.foodId].finalPrice += Number(item.finalPrice);
         }
 
         return acc;
       },
       {} as Record<number, any>
     )
-  ).map((group) => {
-    const massPrice =
-      group.totalMass > 0
-        ? Math.ceil(group.totalMass / group.priceInterval) * group.stepPrice
-        : 0;
-    const finalPrice = massPrice + group.manualPriceSum;
-
-    return {
-      ...group,
-      finalPrice
-    };
-  });
+  ).map((group: any) => ({
+    ...group,
+    finalPrice:
+      priceOverride[group.foodId] !== undefined
+        ? priceOverride[group.foodId]
+        : group.finalPrice
+  }));
 
   const submitTransaction = async () => {
     //only choose one mass if applicable
@@ -213,16 +265,40 @@ export default function InferenceModule({
         .filter((t) => t.itemStatus === 'VENDOR_REMOVED')
         .reduce(
           (acc, item) => {
+            //group same cls tgt to get total mass n price
+            let totalMass = null;
+            if (item.predInfo) {
+              if (item.isAgnostic) totalMass = item.predInfo.mass[0];
+              else totalMass = item.predInfo.mass[item.foodId];
+            }
             if (!acc[item.foodId]) {
               acc[item.foodId] = {
                 foodId: item.foodId,
                 name: item.name,
                 stepPrice: Number(item.stepPrice),
                 priceInterval: Number(item.priceInterval),
-                finalPrice: Number(item.finalPrice),
-                activePriceId: item.activePriceId
+                totalMass,
+                activePriceId: item.activePriceId,
+                itemStatus: item.itemStatus,
+                finalPrice: Number(item.finalPrice)
               };
+            } else {
+              if (item.predInfo) {
+                if (acc[item.foodId].totalMass === null) {
+                  acc[item.foodId].totalMass = 0;
+                }
+                if (item.isAgnostic)
+                  acc[item.foodId].totalMass += Number(
+                    item.predInfo?.mass[0] ?? 0
+                  );
+                else
+                  acc[item.foodId].totalMass += Number(
+                    item.predInfo?.mass[item.foodId] ?? 0
+                  );
+              }
+              acc[item.foodId].finalPrice += Number(item.finalPrice);
             }
+
             return acc;
           },
           {} as Record<number, any>
@@ -232,6 +308,7 @@ export default function InferenceModule({
         fileName,
         selectedModel
       );
+      clearFiles();
       reset(); // Clear the board after success
       alert('Transaction Saved!');
     } catch (err) {
@@ -243,8 +320,8 @@ export default function InferenceModule({
     <Tabs defaultValue="all">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
-          <Dialog>
-            <DialogTrigger className="flex items-center bg-gradient-to-r from-amber-400 to-orange-500 hover:from-amber-500 hover:to-orange-600 text-white font-semibold shadow-md transition-all gap-2 px-4 py-2 rounded-md">
+          <Dialog open={isAddModalOpen} onOpenChange={setIsAddModalOpen}>
+            <DialogTrigger className="flex items-center border-primary/20 hover:bg-primary/5 font-semibold shadow-md transition-all gap-2 px-4 py-2 rounded-md cursor-pointer">
               <PlusCircle className="h-5 w-5" />
               <span className="hidden sm:inline">Add Food Item</span>
             </DialogTrigger>
@@ -265,8 +342,9 @@ export default function InferenceModule({
             defaultValue={[modelType.enumValues[0]]}
             variant="outline"
             onValueChange={(i) => {
-              chgModel(i[0] as ModelEnumType);
+              if (i.length) chgModel(i[0] as ModelEnumType);
             }}
+            value={[selectedModel]}
           >
             {modelType.enumValues.map((i) => (
               <ToggleGroupItem key={i} value={i}>
@@ -308,15 +386,14 @@ export default function InferenceModule({
                 className="col-span-1 md:col-span-7 flex flex-col items-center justify-center overflow-hidden bg-muted/30 border-muted rounded-xl shadow-inner relative"
                 style={{ minHeight: '640px' }}
               >
-                {files.length > 0 && currentItems.length > 0 ? (
+                {files.length > 0 ? (
                   <FoodAnnotation
-                    foodSrc={URL.createObjectURL(files[0].file as File)}
-                    labels={currentItems.filter(
-                      (t) => t.itemStatus !== 'VENDOR_REMOVED'
-                    )}
-                    isAgnostic={currentItems[0]?.isAgnostic ?? false}
+                    foodSrc={objectUrl || ''}
+                    labels={currentItems}
+                    isAgnostic={currentItems[0]?.isAgnostic ?? true}
                     initFoodItems={initialFoodItems}
                     initNewOffset={initialOffset}
+                    isPredicting={isPredicting}
                     changeFoodItem={changeFoodItem}
                   />
                 ) : (
@@ -351,7 +428,7 @@ export default function InferenceModule({
                         </TableRow>
                       </TableHeader>
                       <TableBody>
-                        {groupedItems.map((g: any) => (
+                        {groupedItems.map((g, i: number) => (
                           <TableRow key={g.foodId}>
                             <TableCell className="font-semibold capitalize text-foreground/90">
                               {g.name}
@@ -361,21 +438,41 @@ export default function InferenceModule({
                               {g.priceInterval}g
                             </TableCell>
                             <TableCell className="hidden md:table-cell text-sm text-foreground/80 font-medium">
-                              {g.totalMass > 0
+                              {g.totalMass && g.totalMass > 0
                                 ? `${g.totalMass.toFixed(1)}g`
                                 : '-'}
                             </TableCell>
                             <TableCell className="text-right">
                               <div className="flex items-center justify-end font-mono font-bold text-primary">
                                 $
-                                <input
-                                  type="number"
-                                  className="w-16 ml-1 p-1 text-right bg-transparent border-b border-primary/20 focus:border-primary focus:outline-none transition-colors"
-                                  value={g.finalPrice.toFixed(2)}
-                                  onChange={(e) =>
-                                    (g.finalPrice = e.target.value)
-                                  }
-                                />
+                                <form
+                                  onSubmit={(e) => {
+                                    e.preventDefault(); // Prevents the page from reloading
+                                    // Grab the value from the input using its name attribute
+                                    const formInput =
+                                      e.currentTarget.elements.namedItem(
+                                        'overrideInput'
+                                      ) as HTMLInputElement;
+
+                                    handlePriceOverride(
+                                      g.foodId,
+                                      Number(formInput.value)
+                                    );
+                                    formInput.blur(); // Optional: removes focus from the input after pressing Enter
+                                  }}
+                                >
+                                  <input
+                                    name="overrideInput"
+                                    className="w-16 ml-1 p-1 text-right bg-transparent border-b border-primary/20 focus:border-primary focus:outline-none transition-colors [&::-webkit-inner-spin-button]:appearance-none"
+                                    defaultValue={
+                                      priceOverride[g.foodId] !== undefined
+                                        ? priceOverride[g.foodId]
+                                        : g.finalPrice.toFixed(2)
+                                    }
+                                    min="0"
+                                    step="0.01"
+                                  />
+                                </form>
                               </div>
                             </TableCell>
                             <TableCell className="text-right pr-4">
@@ -396,7 +493,7 @@ export default function InferenceModule({
                   </CardContent>
                 </Card>
 
-                <Card className="w-full bg-gradient-to-br from-primary/5 to-primary/10 border-primary/20 flex-shrink-0 shadow-md rounded-xl mt-auto">
+                <Card className="w-full bg-linear-to-br from-primary/5 to-primary/10 border-primary/20 shrink-0 shadow-md rounded-xl mt-auto">
                   <CardContent className="p-6 flex items-center justify-between">
                     <div className="flex flex-col">
                       <span className="text-sm font-medium text-muted-foreground uppercase tracking-wider">

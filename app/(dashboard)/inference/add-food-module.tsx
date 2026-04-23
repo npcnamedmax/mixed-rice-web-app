@@ -6,7 +6,6 @@ import { Field, FieldGroup } from '@/components/ui/field';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { FoodList } from '@/components/food/foodList';
-import { InsertTransactionitems } from '@/lib/schema';
 import { getMoreFoodItems } from '@/actions/foodActions';
 import { TransactionItemView } from './inference-module';
 
@@ -70,8 +69,8 @@ export function FoodItemAddModule({
       finalPrice: inputRef.current ? inputRef.current.value : '0',
       name: foodItem.name,
       priceInterval: foodItem.foodPrices.priceInterval,
-      stepPrice: foodItem.foodPrices.stepPrice,
-      selectedMassIndex: 0
+      stepPrice: foodItem.foodPrices.stepPrice.toString(),
+      isAgnostic: null
     };
     addFoodItem(f);
     setFoodItem(null);
@@ -93,7 +92,6 @@ export function FoodItemAddModule({
               id="name"
               name="finalPrice"
               ref={inputRef}
-              // Fixed the crash bug here!
               defaultValue={foodItem?.foodPrices?.stepPrice || '0'}
             />
           </Field>

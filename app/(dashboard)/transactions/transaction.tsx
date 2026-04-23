@@ -30,7 +30,7 @@ export function Transaction({
     router.push(`${pathname}/details?${params.toString()}`, { scroll: false });
   }
   return (
-    <TableRow onClick={() => visitDetailPage()}>
+    <TableRow onClick={() => visitDetailPage()} className="cursor-pointer">
       <TableCell className="font-medium text-ellipsis">
         {transactionItem.id}
       </TableCell>
@@ -40,7 +40,7 @@ export function Transaction({
         </Badge>
       </TableCell>
       <TableCell className="hidden md:table-cell">{`$${transactionItem.totalPrice}`}</TableCell>
-      <TableCell className="hidden md:table-cell">{`$${transactionItem.model_type}`}</TableCell>
+      <TableCell className="hidden md:table-cell">{`${transactionItem.model_type}`}</TableCell>
       <TableCell className="hidden md:table-cell">
         {transactionItem.createdAt.toDateString()}
       </TableCell>

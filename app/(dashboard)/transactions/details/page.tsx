@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { getTransactionWithDetail } from '@/lib/db';
 import { dbRunner } from '@/lib/dbClient';
 import { InferenceScreen } from '../../inference';
-import { error } from 'console';
+import { notFound } from 'next/navigation';
 
 export const dynamic = 'force-dynamic';
 
@@ -14,7 +14,7 @@ export default async function TransactionsPage(props: {
 }) {
   const searchParams = await props.searchParams;
   const id = searchParams.id;
-  if (!id) throw error();
+  if (!id) return notFound();
   const { transaction } = await dbRunner((db) =>
     getTransactionWithDetail(
       db,
@@ -22,7 +22,7 @@ export default async function TransactionsPage(props: {
       id
     )
   );
-  if (!transaction) throw error();
+  if (!transaction) return notFound();
 
   return (
     <Tabs defaultValue="all">

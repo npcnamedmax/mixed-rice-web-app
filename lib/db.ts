@@ -6,7 +6,6 @@ import { drizzle } from 'drizzle-orm/postgres-js';
 import * as schema from './schema.ts';
 import { count, eq, ilike, inArray } from 'drizzle-orm';
 import { dbType } from './dbClient.ts';
-import { SwitchCamera } from 'lucide-react';
 
 type MergeSelect<T extends Record<PropertyKey, unknown>> = {
   [K in keyof T]: T[K] | null;

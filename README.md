@@ -12,7 +12,7 @@
 
 [![Anurag's GitHub stats](https://github-readme-stats.vercel.app/api?username=npcnamedmax)](https://github.com/anuraghazra/github-readme-stats)
 
-[![Gist Card](https://github-readme-stats.vercel.app/api/gist?id=c3613af421d6df41d09eed9fbdad586d)](https://gist.github.com/Yizack/c3613af421d6df41d09eed9fbdad586d/)
+[![Gist Card](https://github-readme-stats.vercel.app/api/gist?id=c3613af421d6df41d09eed9fbdad586d)](https://gist.github.com/npcnamedmax/c3613af421d6df41d09eed9fbdad586d/)
 
 This is a starter template using the following stack:
 

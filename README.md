@@ -10,7 +10,7 @@
 
 ## Overview
 
-![Anurag's GitHub stats](https://github-readme-stats.vercel.app/api?username=npcnamedmax&theme=dark)
+![Anurag's GitHub stats](https://github-readme-stats.vercel.app/api?username=npcnamedmax&theme=foobar)
 
 ![Gist Card](https://github-readme-stats.vercel.app/api/gist?id=c3613af421d6df41d09eed9fbdad586d)
 

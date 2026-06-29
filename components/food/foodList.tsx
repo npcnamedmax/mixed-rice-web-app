@@ -10,8 +10,8 @@ import {
   CardHeader
 } from '@/components/ui/card';
 import Image from 'next/image';
-import { Spinner } from '../icons'; // Adjust import if needed
-import { Search } from 'lucide-react';
+
+import { Loader, Search } from 'lucide-react';
 import { useInView } from 'react-intersection-observer';
 
 export function FoodList({
@@ -52,6 +52,7 @@ export function FoodList({
   return (
     <Card {...props}>
       <CardHeader>
+        {isLoading && <Loader />}
         <form
           onSubmit={submitSearch}
           className="relative ml-auto flex-1 md:grow-0"
@@ -70,7 +71,7 @@ export function FoodList({
       <CardContent>
         <div className="overflow-y-auto pr-2 max-h-[60vh]">
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            {isLoading && <Spinner />}
+            {isLoading && <Loader />}
             {foodItems.map((i: foodItemType) => (
               <Card
                 key={i.id}
@@ -96,7 +97,6 @@ export function FoodList({
             ))}
           </div>
           <div ref={ref} className="flex justify-center p-4">
-            {isLoading && <Spinner />}
             {!isLoading && <span className="text-transparent">trigger</span>}
           </div>
         </div>

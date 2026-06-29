@@ -10,13 +10,9 @@ import {
 import { MoreHorizontal } from 'lucide-react';
 import { TableCell, TableRow } from '@/components/ui/table';
 import { foodItemType } from '@/lib/db';
-import { FoodItemEditDialog } from './food/edit-food-module';
-import { useState } from 'react';
-//import { deleteProduct } from './actions';
+import { deleteFoodItem } from '@/actions/foodActions';
 
 export function FoodItem({ foodItem }: { foodItem: foodItemType }) {
-  const [isOpen, setOpen] = useState(false);
-
   return (
     <TableRow>
       <TableCell className="hidden sm:table-cell">
@@ -50,21 +46,14 @@ export function FoodItem({ foodItem }: { foodItem: foodItemType }) {
             onCloseAutoFocus={(e) => e.preventDefault()}
           >
             <DropdownMenuLabel>Actions</DropdownMenuLabel>
-            <DropdownMenuItem onSelect={() => setOpen(true)}>
-              Edit
-            </DropdownMenuItem>
             <DropdownMenuItem>
-              <form action={''}>
-                <button type="button">Delete</button>
+              <form action={deleteFoodItem}>
+                <input type="hidden" name="id" value={foodItem.id} />
+                <button type="submit">Delete</button>
               </form>
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
-        <FoodItemEditDialog
-          foodItem={foodItem}
-          isOpen={isOpen}
-          isOpenFc={setOpen}
-        />
       </TableCell>
     </TableRow>
   );

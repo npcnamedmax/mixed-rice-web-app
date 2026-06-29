@@ -18,8 +18,15 @@ export type FileMetadata = {
   id: string;
 };
 
+export type ImageFile = (FileMetadata | File) & {
+  originalSizeInPx?: {
+    width: number;
+    height: number;
+  };
+};
+
 export type FileWithPreview = {
-  file: File | FileMetadata;
+  file: ImageFile;
   id: string;
   preview?: string;
 };
@@ -86,7 +93,7 @@ export const useFileUpload = (
   const inputRef = useRef<HTMLInputElement>(null);
 
   const validateFile = useCallback(
-    (file: File | FileMetadata): string | null => {
+    (file: ImageFile): string | null => {
       if (file instanceof File) {
         if (file.size > maxSize) {
           return `File "${file.name}" exceeds the maximum size of ${formatBytes(maxSize)}.`;
@@ -123,17 +130,14 @@ export const useFileUpload = (
     [accept, maxSize]
   );
 
-  const createPreview = useCallback(
-    (file: File | FileMetadata): string | undefined => {
-      if (file instanceof File) {
-        return URL.createObjectURL(file);
-      }
-      return file.url;
-    },
-    []
-  );
+  const createPreview = useCallback((file: ImageFile): string | undefined => {
+    if (file instanceof File) {
+      return URL.createObjectURL(file);
+    }
+    return file.url;
+  }, []);
 
-  const generateUniqueId = useCallback((file: File | FileMetadata): string => {
+  const generateUniqueId = useCallback((file: ImageFile): string => {
     if (file instanceof File) {
       return `${file.name}-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
     }
@@ -168,8 +172,30 @@ export const useFileUpload = (
     });
   }, [onFilesChange]);
 
+  const getImageDimensions = (
+    file: File
+  ): Promise<{ width: number; height: number }> => {
+    return new Promise((resolve) => {
+      if (!file.type.startsWith('image/')) {
+        resolve({ width: 0, height: 0 }); // Fallback for non-image files
+        return;
+      }
+      const url = URL.createObjectURL(file);
+      const img = new Image();
+      img.onload = () => {
+        URL.revokeObjectURL(url);
+        resolve({ width: img.naturalWidth, height: img.naturalHeight });
+      };
+      img.onerror = () => {
+        URL.revokeObjectURL(url);
+        resolve({ width: 0, height: 0 }); // Fallback if image fails to load
+      };
+      img.src = url;
+    });
+  };
+
   const addFiles = useCallback(
-    (newFiles: FileList | File[]) => {
+    async (newFiles: FileList | File[]) => {
       if (!newFiles || newFiles.length === 0) return;
 
       const newFilesArray = Array.from(newFiles);
@@ -205,7 +231,6 @@ export const useFileUpload = (
               existingFile.file.name === file.name &&
               existingFile.file.size === file.size
           );
-
           // Skip duplicate files silently
           if (isDuplicate) {
             return;
@@ -238,7 +263,10 @@ export const useFileUpload = (
       if (validFiles.length > 0) {
         // Call the onFilesAdded callback with the newly added valid files
         onFilesAdded?.(validFiles);
-
+        if (!multiple)
+          validFiles[0].file.originalSizeInPx = await getImageDimensions(
+            validFiles[0].file as File
+          );
         setState((prev) => {
           const newFiles = !multiple
             ? validFiles
@@ -367,10 +395,8 @@ export const useFileUpload = (
 
   const openFileDialog = useCallback(() => {
     if (inputRef.current) {
-      console.log('CLICKED');
       inputRef.current.click();
     }
-    console.log('NOOOOO');
   }, []);
 
   const getInputProps = useCallback(

@@ -62,8 +62,8 @@ export const transactions = pgTable('transactions', {
   totalPrice: numeric('total_price', { precision: 10, scale: 2 }).notNull(),
   status: transactionStatus('status'),
   model_type: modelType('model_type'),
-  imgName: text('img_name').notNull(),
-  jsonName: text('json_name').notNull()
+  imgName: text('img_name'), //nullable for manually adding product to transaction
+  jsonName: text('json_name')
 });
 export const transactionItemStatus = pgEnum('transaction_item_status', [
   'PREDICTED_ITEM',
@@ -87,8 +87,8 @@ export const transactionItems = pgTable('transaction_items', {
   finalPrice: numeric('final_price', {
     precision: 10,
     scale: 2
-  }),
-  itemStatus: transactionItemStatus('item_status')
+  }).notNull(),
+  itemStatus: transactionItemStatus('item_status').notNull()
 });
 
 export const FoodPriceRelations = relations(food_prices, ({ many }) => ({
@@ -142,17 +142,18 @@ export type InsertFoodPricesSchema = typeof food_prices.$inferInsert;
 export type SelectTransactionItems = typeof transactionItems.$inferSelect;
 
 type RemoveNullAndUndefined<T, K extends keyof T> = {
+  //removes null and undefined from a property's type
   [P in keyof T]: P extends K ? T[P] : NonNullable<T[P]>;
 };
 
 type RequiredExcept<T, K extends keyof T> = Required<Omit<T, K>> & Pick<T, K>;
-export type InsertTransactionitems = RequiredExcept<
+/* export type InsertTransactionitems = RequiredExcept<
   RemoveNullAndUndefined<
     Pick<
-      typeof transactionItems.$inferInsert,
+      InsertTransactionsItems,
       'foodId' | 'totalMass' | 'finalPrice' | 'itemStatus'
     >,
     'totalMass'
   >,
   'totalMass'
->;
+>; */

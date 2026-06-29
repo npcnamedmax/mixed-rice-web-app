@@ -11,14 +11,18 @@ import {
   TableCell,
   Table
 } from '@/components/ui/table';
-import { useState, useEffect, useMemo } from 'react';
-import { InsertTransactionitems, ModelEnumType, modelType } from '@/lib/schema';
+import { useState, useEffect, useMemo, useRef } from 'react';
+import {
+  InsertTransactionsItems,
+  ModelEnumType,
+  modelType
+} from '@/lib/schema';
 import { Button } from '@/components/ui/button';
 import { PlusCircle, Trash2, Camera, Upload } from 'lucide-react';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import { useFileUpload } from '@/hooks/use-file-upload';
-
-import { v4 as uuidv4 } from 'uuid';
+import { toast } from 'sonner';
+// removed uuid import
 import {
   Dialog,
   DialogContent,
@@ -36,11 +40,13 @@ import { FoodAnnotation } from './foodAnnotation';
 
 export const dynamic = 'force-dynamic';
 
-export type TransactionItemView = Omit<InsertTransactionitems, 'totalMass'> & {
+export type TransactionItemView = Omit<
+  InsertTransactionsItems,
+  'totalMass' | 'transactionId'
+> & {
   activePriceId: number;
   isAgnostic: boolean | null;
   name: string;
-  finalPrice: string;
   predInfo?: PredResponseType | undefined;
   stepPrice: string;
   priceInterval: number;
@@ -66,7 +72,6 @@ export default function InferenceModule({
 }) {
   const [pred, chgPred] = useState<TransactionItemView[]>([]);
   const [currentItems, chgItems] = useState<TransactionItemView[]>([]);
-  const [afterReset, setAfterReset] = useState(false);
   const [isPredicting, setIsPredicting] = useState(false);
   const [fileName, setFileName] = useState<string | null>(null);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
@@ -76,12 +81,14 @@ export default function InferenceModule({
   const [priceOverride, setPriceOverride] = useState<Record<number, number>>(
     {}
   );
+  const inputRefs = useRef<Record<any, HTMLInputElement | null>>({});
   const [{ files }, { openFileDialog, getInputProps, clearFiles }] =
     useFileUpload({
       accept: '.jpg,.jpeg,.png',
       multiple: false,
       maxFiles: 1,
-      maxSize: 49e6 //49mb
+      maxSize: 49e6, //49mb
+      onFilesChange: () => reset()
     });
 
   const addItem = (f: TransactionItemView) => {
@@ -92,6 +99,7 @@ export default function InferenceModule({
       );
 
       if (exists) {
+        toast('Item already exists.');
         return prev;
       }
       return [...prev, f];
@@ -125,9 +133,13 @@ export default function InferenceModule({
         priceInterval: updated.priceInterval,
         name: updated.name
       };
+      groupItems(newItems.filter((e) => e.itemStatus !== 'VENDOR_REMOVED'));
+      const input = inputRefs.current[updated.classId];
+      if (input != null) input.value = updated.finalPrice.toString(); // reset the price field
       return newItems;
     });
     setPriceOverride((prev) => {
+      //remove price override
       const newOverrides = { ...prev };
       delete newOverrides[updated.classId];
       return newOverrides;
@@ -135,14 +147,13 @@ export default function InferenceModule({
   };
 
   const predict = async () => {
-    if (!afterReset) reset();
     //get pred
     const file = files[0].file;
 
     const formData = new FormData();
     let fileName = '';
     if (file instanceof File) {
-      fileName = `${uuidv4()}.${file.name.split('.').pop()}`;
+      fileName = `${crypto.randomUUID()}.${file.name.split('.').pop()}`;
       formData.append('file', file);
     } else {
       console.error('The uploaded item is not a valid File object');
@@ -154,8 +165,10 @@ export default function InferenceModule({
     try {
       const predictionResults = await getPrediction(formData, selectedModel);
 
-      if (predictionResults === null)
-        throw new Error('Prediction returned null');
+      if (predictionResults === null) {
+        toast('Prediction returned null');
+        return;
+      }
       chgItems(predictionResults);
       chgPred(predictionResults);
       console.log('Predictions:', predictionResults);
@@ -165,14 +178,16 @@ export default function InferenceModule({
     } finally {
       setFileName(fileName);
       setIsPredicting(false);
-      setAfterReset(false);
     }
   };
 
   const reset = () => {
     chgItems([]);
     setFileName(null);
-    setAfterReset(true);
+    chgPred([]);
+    setIsPredicting(false);
+    setIsAddModalOpen(false);
+
     setPriceOverride({});
   };
 
@@ -211,103 +226,62 @@ export default function InferenceModule({
   );
 
   const groupedItems: GroupItemView[] = Object.values(
-    activeItems.reduce(
-      (acc, item) => {
-        //group same cls tgt to get total mass n price
-        let totalMass = null;
-        if (item.predInfo) {
-          if (item.isAgnostic) totalMass = item.predInfo.mass[0];
-          else totalMass = item.predInfo.mass[item.foodId];
-        }
-        if (!acc[item.foodId]) {
-          acc[item.foodId] = {
-            foodId: item.foodId,
-            name: item.name,
-            stepPrice: Number(item.stepPrice),
-            priceInterval: Number(item.priceInterval),
-            totalMass,
-            activePriceId: item.activePriceId,
-            itemStatus: item.itemStatus,
-            finalPrice: Number(item.finalPrice)
-          };
-        } else {
-          if (item.predInfo) {
-            if (acc[item.foodId].totalMass === null) {
-              acc[item.foodId].totalMass = 0;
-            }
-            if (item.isAgnostic)
-              acc[item.foodId].totalMass += Number(item.predInfo?.mass[0] ?? 0);
-            else
-              acc[item.foodId].totalMass += Number(
-                item.predInfo?.mass[item.foodId] ?? 0
-              );
-          }
-          acc[item.foodId].finalPrice += Number(item.finalPrice);
-        }
+    groupItems(activeItems)
+  ).map((group: any) => {
+    return {
+      ...group,
+      finalPrice:
+        priceOverride[group.foodId] !== undefined
+          ? priceOverride[group.foodId]
+          : group.finalPrice
+    };
+  });
 
-        return acc;
-      },
-      {} as Record<number, any>
-    )
-  ).map((group: any) => ({
-    ...group,
-    finalPrice:
-      priceOverride[group.foodId] !== undefined
-        ? priceOverride[group.foodId]
-        : group.finalPrice
-  }));
+  function groupItems(
+    items: TransactionItemView[]
+  ): Record<number, GroupItemView> {
+    return items
+      .filter((t) => t.itemStatus !== 'VENDOR_REMOVED')
+      .reduce(
+        (acc, item) => {
+          let totalMass = null;
+          if (item.predInfo) {
+            totalMass = item.isAgnostic
+              ? item.predInfo.mass[0]
+              : item.predInfo.mass[item.foodId];
+          }
+          if (!acc[item.foodId]) {
+            acc[item.foodId] = {
+              foodId: item.foodId,
+              name: item.name,
+              stepPrice: Number(item.stepPrice),
+              priceInterval: Number(item.priceInterval),
+              totalMass,
+              activePriceId: item.activePriceId,
+              itemStatus: item.itemStatus,
+              finalPrice: Number(item.finalPrice)
+            };
+          } else {
+            if (item.predInfo) {
+              if (acc[item.foodId].totalMass === null)
+                acc[item.foodId].totalMass = 0;
+              acc[item.foodId].totalMass! += item.isAgnostic
+                ? Number(item.predInfo?.mass[0] ?? 0)
+                : Number(item.predInfo?.mass[item.foodId] ?? 0);
+            }
+            acc[item.foodId].finalPrice += Number(item.finalPrice);
+          }
+          return acc;
+        },
+        {} as Record<number, GroupItemView>
+      );
+  }
 
   const submitTransaction = async () => {
     //only choose one mass if applicable
-    if (currentItems.length === 0 || fileName === null) return;
+    if (groupedItems.length === 0) return;
     try {
-      const removedGroup = currentItems
-        .filter((t) => t.itemStatus === 'VENDOR_REMOVED')
-        .reduce(
-          (acc, item) => {
-            //group same cls tgt to get total mass n price
-            let totalMass = null;
-            if (item.predInfo) {
-              if (item.isAgnostic) totalMass = item.predInfo.mass[0];
-              else totalMass = item.predInfo.mass[item.foodId];
-            }
-            if (!acc[item.foodId]) {
-              acc[item.foodId] = {
-                foodId: item.foodId,
-                name: item.name,
-                stepPrice: Number(item.stepPrice),
-                priceInterval: Number(item.priceInterval),
-                totalMass,
-                activePriceId: item.activePriceId,
-                itemStatus: item.itemStatus,
-                finalPrice: Number(item.finalPrice)
-              };
-            } else {
-              if (item.predInfo) {
-                if (acc[item.foodId].totalMass === null) {
-                  acc[item.foodId].totalMass = 0;
-                }
-                if (item.isAgnostic)
-                  acc[item.foodId].totalMass += Number(
-                    item.predInfo?.mass[0] ?? 0
-                  );
-                else
-                  acc[item.foodId].totalMass += Number(
-                    item.predInfo?.mass[item.foodId] ?? 0
-                  );
-              }
-              acc[item.foodId].finalPrice += Number(item.finalPrice);
-            }
-
-            return acc;
-          },
-          {} as Record<number, any>
-        );
-      await saveTransactionToDb(
-        [...groupedItems, ...Object.values(removedGroup)],
-        fileName,
-        selectedModel
-      );
+      await saveTransactionToDb(groupedItems, fileName, selectedModel);
       clearFiles();
       reset(); // Clear the board after success
       alert('Transaction Saved!');
@@ -372,7 +346,15 @@ export default function InferenceModule({
           <Button
             variant="ghost"
             disabled={pred.length === 0 || isPredicting}
-            onClick={() => chgItems(pred)}
+            onClick={() => {
+              setPriceOverride({});
+              chgItems(pred);
+              const refs = inputRefs.current;
+              Object.values(groupItems(pred)).forEach((g) => {
+                const input = refs[g.foodId];
+                if (input != null) input.value = g.finalPrice.toString();
+              });
+            }}
           >
             Reset
           </Button>
@@ -389,6 +371,7 @@ export default function InferenceModule({
                 {files.length > 0 ? (
                   <FoodAnnotation
                     foodSrc={objectUrl || ''}
+                    imgOriSize={currentFile.originalSizeInPx}
                     labels={currentItems}
                     isAgnostic={currentItems[0]?.isAgnostic ?? true}
                     initFoodItems={initialFoodItems}
@@ -453,11 +436,15 @@ export default function InferenceModule({
                                       e.currentTarget.elements.namedItem(
                                         'overrideInput'
                                       ) as HTMLInputElement;
-
-                                    handlePriceOverride(
-                                      g.foodId,
-                                      Number(formInput.value)
-                                    );
+                                    const reg = /\d+(\.\d{0,1,2})?$/;
+                                    if (reg.test(formInput.value))
+                                      handlePriceOverride(
+                                        g.foodId,
+                                        Number(
+                                          Number(formInput.value).toFixed(2)
+                                        )
+                                      );
+                                    else toast('Invalid price input');
                                     formInput.blur(); // Optional: removes focus from the input after pressing Enter
                                   }}
                                 >
@@ -465,10 +452,13 @@ export default function InferenceModule({
                                     name="overrideInput"
                                     className="w-16 ml-1 p-1 text-right bg-transparent border-b border-primary/20 focus:border-primary focus:outline-none transition-colors [&::-webkit-inner-spin-button]:appearance-none"
                                     defaultValue={
-                                      priceOverride[g.foodId] !== undefined
-                                        ? priceOverride[g.foodId]
-                                        : g.finalPrice.toFixed(2)
+                                      priceOverride[g.foodId] ??
+                                      Number(g.finalPrice)
                                     }
+                                    ref={(element) => {
+                                      inputRefs.current[g.foodId] = element;
+                                    }}
+                                    type="numeric"
                                     min="0"
                                     step="0.01"
                                   />
@@ -511,12 +501,8 @@ export default function InferenceModule({
                     </div>
                     <Button
                       size="lg"
-                      className="px-8 text-lg shadow-lg font-bold bg-primary hover:bg-primary/90 transition-all hover:scale-[1.02] active:scale-[0.98]"
-                      disabled={
-                        currentItems.filter(
-                          (t) => t.itemStatus !== 'VENDOR_REMOVED'
-                        ).length === 0
-                      }
+                      className="px-8 text-lg shadow-lg font-bold bg-primary hover:bg-primary/90 transition-all active:scale-[0.98]"
+                      disabled={activeItems.length === 0}
                       onClick={submitTransaction}
                     >
                       Complete Transaction

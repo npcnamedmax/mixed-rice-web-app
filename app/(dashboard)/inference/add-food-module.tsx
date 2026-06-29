@@ -64,6 +64,7 @@ export function FoodItemAddModule({
     if (foodItem === null) return;
     let f: TransactionItemView = {
       foodId: foodItem.classId,
+      foodPriceId: foodItem.foodPrices.id,
       itemStatus: 'VENDOR_ADDED',
       activePriceId: foodItem.activePriceId,
       finalPrice: inputRef.current ? inputRef.current.value : '0',
@@ -115,7 +116,6 @@ export function FoodItemAddModule({
       onSearch={onSearch}
       onLoadMore={onLoadMore}
       searchTerm={searchTerm}
-      isLoading={isLoading}
       className="border-0"
     />
   );

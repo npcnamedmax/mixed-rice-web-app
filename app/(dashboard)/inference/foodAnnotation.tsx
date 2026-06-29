@@ -27,6 +27,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { TransactionItemView } from './inference-module';
 import { Loader } from 'lucide-react';
+import { toast } from 'sonner';
 
 type ComboboxItemType = {
   name: string;
@@ -44,7 +45,8 @@ export function FoodAnnotation({
   initFoodItems,
   initNewOffset,
   isPredicting,
-  changeFoodItem
+  changeFoodItem,
+  imgOriSize
 }: {
   foodSrc: string;
   labels: TransactionItemView[];
@@ -63,6 +65,12 @@ export function FoodAnnotation({
       activePriceId: number;
     }
   ) => void;
+  imgOriSize:
+    | {
+        width: number;
+        height: number;
+      }
+    | undefined;
 }) {
   const [selectedIdx, setSelectedIdx] = useState<number | null>(null);
   const [stagedItem, setStagedItem] = useState<ComboboxItemType | null>(null);
@@ -113,44 +121,100 @@ export function FoodAnnotation({
     const currentSelectedItem = labels[selectedIdx];
     const newPrice = inputRef.current?.value;
     if (!newPrice || !currentSelectedItem) return;
+    const reg = /\d+(\.\d{0,1,2})?$/;
+    if (reg.test(newPrice)) {
+      changeFoodItem(selectedIdx, {
+        name: stagedItem.name,
+        classId: stagedItem.classId,
+        finalPrice: Number(newPrice),
+        priceInterval: stagedItem.priceInterval,
+        stepPrice: stagedItem.stepPrice,
+        activePriceId: stagedItem.activePriceId
+      });
+      setCurrentIdx(null);
+    } else toast('Invalid Price Value');
+  };
 
-    changeFoodItem(selectedIdx, {
-      name: stagedItem.name,
-      classId: stagedItem.classId,
-      finalPrice: Number(newPrice),
-      priceInterval: stagedItem.priceInterval,
-      stepPrice: stagedItem.stepPrice,
-      activePriceId: stagedItem.activePriceId
-    });
-    setCurrentIdx(null);
+  const width = 640;
+  const height = 640;
+
+  const calculateBoxPos = (
+    imgOriSize: {
+      width: number;
+      height: number;
+    },
+    x1: number,
+    x2: number,
+    y1: number,
+    y2: number
+  ): {
+    top: string;
+    left: string;
+    width: string;
+    height: string;
+  } => {
+    const imgWidth = imgOriSize.width;
+    const imgHeight = imgOriSize.height;
+    let res = { top: 0, left: 0, width: 0, height: 0 };
+    if (imgWidth > imgHeight) {
+      const newHeight = imgHeight * (width / imgWidth);
+      res.top = (height - newHeight) / 2 + (y1 / imgHeight) * newHeight;
+      res.left = (x1 / imgWidth) * width;
+      res.width = ((x2 - x1) / imgWidth) * width;
+      res.height = ((y2 - y1) / imgHeight) * newHeight;
+    } else {
+      const newWidth = imgWidth * (height / imgHeight);
+      res.left = (width - newWidth) / 2 + (x1 / imgWidth) * newWidth;
+      res.top = (y1 / imgHeight) * height;
+      res.width = ((x2 - x1) / imgWidth) * newWidth;
+      res.height = ((y2 - y1) / imgHeight) * height;
+    }
+    return {
+      top: `${res.top}px`,
+      left: `${res.left}px`,
+      width: `${res.width}px`,
+      height: `${res.height}px`
+    };
   };
 
   return (
-    <div className="relative" style={{ width: '640px', height: '640px' }}>
-      {labels.map(
-        (i, idx) =>
-          i.predInfo &&
-          i.itemStatus !== 'VENDOR_REMOVED' && (
-            <Button
-              key={idx}
-              onClick={() => setCurrentIdx(idx)}
-              className="absolute z-10 border-2 border-amber-50 bg-transparent p-0 cursor-pointer hover:bg-amber-50/20"
-              style={{
-                left: `${i.predInfo.box.x1}px`,
-                top: `${i.predInfo.box.y1}px`,
-                width: `${i.predInfo.box.x2 - i.predInfo.box.x1}px`,
-                height: `${i.predInfo.box.y2 - i.predInfo.box.y1}px`
-              }}
-            >
-              <div
-                className={`absolute bg-amber-50 z-10 text-sm text-black top-0 left-0`}
+    <div
+      className="relative"
+      style={{ width: `${width}px`, height: `${height}px` }}
+    >
+      {imgOriSize &&
+        labels.map(
+          (i, idx) =>
+            i.predInfo &&
+            i.itemStatus !== 'VENDOR_REMOVED' && (
+              <Button
+                key={idx}
+                onClick={() => setCurrentIdx(idx)}
+                className="absolute z-10 border-2 border-amber-50 bg-transparent p-0 cursor-pointer hover:bg-amber-50/20"
+                style={calculateBoxPos(
+                  imgOriSize,
+                  i.predInfo.box.x1,
+                  i.predInfo.box.x2,
+                  i.predInfo.box.y1,
+                  i.predInfo.box.y2
+                )}
               >
-                {i.name}
-              </div>
-            </Button>
-          )
+                <div
+                  className={`absolute bg-amber-50 z-10 text-sm text-black top-0 left-0`}
+                >
+                  {i.name}
+                </div>
+              </Button>
+            )
+        )}{' '}
+      {foodSrc !== '' && (
+        <Image
+          src={foodSrc}
+          fill
+          alt="foodImg"
+          className="object-contain z-0"
+        />
       )}
-      <Image src={foodSrc} fill alt="foodImg" className="object-contain z-0" />
       {isPredicting && (
         <div className="absolute inset-0 z-20 flex items-center justify-center pointer-events-none bg-gray-500/50 backdrop-blur-sm">
           <Loader />

@@ -289,4 +289,67 @@ export async function insertTransactionItems(
 }
 
 //------------------------
-//export async function
+export async function deleteFoodItemById(db: dbType, id: number) {
+  try {
+    await db.delete(schema.food_items).where(eq(schema.food_items.id, id));
+    return { error: null };
+  } catch (error) {
+    return { error };
+  }
+}
+
+export async function insertFoodItem(
+  db: dbType,
+  foodItem: Omit<schema.InsertFoodItemsSchema, 'activePriceId'>,
+  foodPrice: schema.InsertFoodPricesSchema
+) {
+  try {
+    let x = await db
+      .insert(schema.food_prices)
+      .values({
+        stepPrice: foodPrice.stepPrice,
+        priceInterval: foodPrice.priceInterval
+      })
+      .returning();
+
+    let y = await db
+      .insert(schema.food_items)
+      .values({
+        ...foodItem,
+        activePriceId: x[0].id
+      })
+      .returning();
+
+    return { data: y[0], error: null };
+  } catch (error) {
+    return { data: null, error };
+  }
+}
+
+export async function deleteTransactionById(db: dbType, id: number) {
+  try {
+    await db
+      .delete(schema.transactionItems)
+      .where(eq(schema.transactionItems.transactionId, id));
+    await db.delete(schema.transactions).where(eq(schema.transactions.id, id));
+    return { error: null };
+  } catch (error) {
+    return { error };
+  }
+}
+
+export async function updateTransactionStatusById(
+  db: dbType,
+  id: number,
+  status: 'INVALID' | 'APPROVED' | 'REJECTED'
+) {
+  try {
+    await db
+      .update(schema.transactions)
+      .set({ status })
+      .where(eq(schema.transactions.id, id));
+    return { error: null };
+  } catch (error) {
+    return { error };
+  }
+}

@@ -1,3 +1,4 @@
+import { Toaster } from '@/components/ui/sonner';
 import './globals.css';
 
 export const metadata = {
@@ -13,7 +14,20 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en">
-      <body className="flex min-h-screen w-full flex-col">{children}</body>
+      <body className="flex min-h-screen w-full flex-col">
+        <Toaster
+          position="bottom-center"
+          toastOptions={{
+            style: {
+              background: '#fff',
+              color: '#111827',
+              opacity: 1,
+              border: '1px solid #e5e7eb'
+            }
+          }}
+        />
+        {children}
+      </body>
     </html>
   );
 }

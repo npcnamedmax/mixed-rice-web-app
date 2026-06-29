@@ -15,8 +15,13 @@ import { Label } from '@/components/ui/label';
 
 import { FoodList } from '@/components/food/foodList';
 import { useState, useTransition } from 'react';
-import { getMoreFoodItems, submitEdit } from '@/actions/foodActions';
+import {
+  getMoreFoodItems,
+  submitEdit,
+  createFoodItem
+} from '@/actions/foodActions';
 import { Spinner } from '@/components/icons';
+import { PlusCircle } from 'lucide-react';
 
 export function FoodItemEditModule({
   initFoodItems,

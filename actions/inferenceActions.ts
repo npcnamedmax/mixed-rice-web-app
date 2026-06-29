@@ -125,7 +125,7 @@ export const getPrediction = async (
 
 export const saveTransactionToDb = async (
   items: GroupItemView[],
-  fileName: string,
+  fileName: string | null,
   model: ModelEnumType
 ) => {
   if (
@@ -140,19 +140,20 @@ export const saveTransactionToDb = async (
     process.env.SUPABASE_SECRET_KEY
   );
   const bucketName = 'prediction_info';
-
-  const jsonFileName = `${fileName.split('.')[0]}.json`;
-  // Move file first
-  try {
-    await supabase.storage
-      .from(bucketName)
-      .move(`tmp/${fileName}`, `transacted/${fileName}`);
-    await supabase.storage
-      .from(bucketName)
-      .move(`tmp/${jsonFileName}`, `transacted/${jsonFileName}`);
-  } catch (err) {
-    console.error('Failed to move file', err);
-    throw err;
+  const jsonFileName = (fileName && `${fileName.split('.')[0]}.json`) || null;
+  if (fileName) {
+    // Move file first
+    try {
+      await supabase.storage
+        .from(bucketName)
+        .move(`tmp/${fileName}`, `transacted/${fileName}`);
+      await supabase.storage
+        .from(bucketName)
+        .move(`tmp/${jsonFileName}`, `transacted/${jsonFileName}`);
+    } catch (err) {
+      console.error('Failed to move file', err);
+      throw err;
+    }
   }
 
   const totalPrice = items.reduce(
@@ -186,7 +187,7 @@ export const saveTransactionToDb = async (
       itemStatus: i.itemStatus
     };
   });
-  console.log(transactionItemsData);
+  console.log('Transacted Items: ', transactionItemsData);
   const { error: dbItemError } = await dbRunner((db) =>
     insertTransactionItems(db, transactionItemsData)
   );

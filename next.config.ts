@@ -1,6 +1,11 @@
 import { hostname } from 'os';
 
 export default {
+  experimental: {
+    serverActions: {
+      bodySizeLimit: '20mb'
+    }
+  },
   images: {
     remotePatterns: [
       {
@@ -20,6 +25,10 @@ export default {
       {
         protocol: 'https',
         hostname: 'images.unsplash.com'
+      },
+      {
+        protocol: 'https',
+        hostname: 'ckjejxhukysuuzhjxsvo.supabase.co'
       }
     ]
   }

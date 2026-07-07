@@ -8,6 +8,7 @@ import { getMoreFoodItems } from '@/actions/foodActions';
 import { Field, FieldGroup } from '@/components/ui/field';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
+import { cn } from '@/lib/utils';
 import {
   Combobox,
   ComboboxContent,
@@ -50,7 +51,7 @@ export function FoodAnnotation({
 }: {
   foodSrc: string;
   labels: TransactionItemView[];
-  isAgnostic: boolean | null;
+  isAgnostic: boolean;
   initFoodItems: foodItemType[];
   initNewOffset: number | null;
   isPredicting: boolean;
@@ -206,7 +207,7 @@ export function FoodAnnotation({
                 </div>
               </Button>
             )
-        )}{' '}
+        )}
       {foodSrc !== '' && (
         <Image
           src={foodSrc}
@@ -277,7 +278,6 @@ export function FoodAnnotation({
                       inputRef.current.value = i.finalPrice.toFixed(2);
                     }
                   }}
-                  disabled={!!isAgnostic}
                 >
                   <ComboboxTrigger
                     render={
@@ -289,13 +289,14 @@ export function FoodAnnotation({
                       </Button>
                     }
                   />
-                  <ComboboxContent>
+                  <ComboboxContent className="w-(--anchor-width) min-w-64 p-1">
                     <ComboboxInput
                       showTrigger={false}
                       value={''}
                       className="hidden"
                     />
                     <ComboboxList
+                      className="max-h-72 overflow-y-auto"
                       onScroll={(e) => {
                         const target = e.currentTarget;
                         if (
@@ -306,34 +307,39 @@ export function FoodAnnotation({
                         }
                       }}
                     >
-                      {(i: any, idx: number) => (
-                        <ComboboxItem
-                          key={idx}
-                          value={i}
-                          style={
-                            stagedItem && stagedItem.classId === i.classId
-                              ? { backgroundColor: '#95b4dfff' }
-                              : {}
-                          }
-                        >
-                          <Item size="xs" className="p-0">
-                            <ItemContent>
-                              <ItemTitle className="whitespace-nowrap">
-                                {i.name.charAt(0).toUpperCase() +
-                                  i.name.slice(1)}
-                              </ItemTitle>
-                              <ItemDescription>
-                                {selectedIdx !== null &&
-                                labels[selectedIdx].predInfo?.mass?.[
-                                  isAgnostic ? 0 : i.classId
-                                ]
-                                  ? `${labels[selectedIdx].predInfo.mass[isAgnostic ? 0 : i.classId]}g`
-                                  : '-'}
-                              </ItemDescription>
-                            </ItemContent>
-                          </Item>
-                        </ComboboxItem>
-                      )}
+                      {(i: any, idx: number) => {
+                        const isActive =
+                          stagedItem && stagedItem.classId === i.classId;
+                        return (
+                          <ComboboxItem
+                            key={idx}
+                            value={i}
+                            className={cn(
+                              'rounded-md transition-colors cursor-pointer',
+                              'hover:bg-accent hover:text-accent-foreground',
+                              isActive &&
+                                'bg-primary/10 text-primary font-medium hover:bg-primary/15'
+                            )}
+                          >
+                            <Item size="xs" className="p-2">
+                              <ItemContent>
+                                <ItemTitle className="whitespace-nowrap">
+                                  {i.name.charAt(0).toUpperCase() +
+                                    i.name.slice(1)}
+                                </ItemTitle>
+                                <ItemDescription>
+                                  {selectedIdx !== null &&
+                                  labels[selectedIdx].predInfo?.mass?.[
+                                    isAgnostic ? 0 : i.classId
+                                  ]
+                                    ? `${labels[selectedIdx].predInfo.mass[isAgnostic ? 0 : i.classId]}g`
+                                    : '-'}
+                                </ItemDescription>
+                              </ItemContent>
+                            </Item>
+                          </ComboboxItem>
+                        );
+                      }}
                     </ComboboxList>
                     {isLoading && (
                       <div className="py-2 text-center text-sm text-muted-foreground w-full">

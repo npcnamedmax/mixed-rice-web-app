@@ -9,12 +9,7 @@ import {
   Table,
   TableCell
 } from '@/components/ui/table';
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle
-} from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { TransactionTypeWithDetail } from '@/lib/db';
 import { PredResponseType } from '@/actions/inferenceActions';
 import { Badge } from '@/components/ui/badge';
@@ -106,9 +101,11 @@ export function TransactionDetailView({
       <CardContent className="p-0">
         <div className="grid grid-cols-1 md:grid-cols-12 gap-6">
           {/* Left: Image with bounding boxes — sticky */}
-          <div className="col-span-1 md:col-span-7">
+          <div
+            className={`col-span-1 md:col-span-7 ${!imageUrl ? 'items-center justify-center flex' : ''}`}
+          >
             <div className="sticky top-4">
-              <Card className="inline-flex items-center justify-center overflow-hidden bg-muted/30 border-muted rounded-xl shadow-inner">
+              <Card className="inline-flex items-center justify-center overflow-hidden bg-transparent border-0 rounded-xl shadoow-none">
                 {imageUrl ? (
                   <div
                     className="relative"
@@ -123,10 +120,11 @@ export function TransactionDetailView({
                         <Button
                           key={idx}
                           onClick={() => setSelectedPredIdx(idx)}
-                          className={`absolute z-10 border-2 bg-transparent p-0 cursor-pointer hover:bg-amber-50/20 ${selectedPredIdx === idx
-                            ? 'border-amber-400 bg-amber-400/15'
-                            : 'border-amber-50'
-                            }`}
+                          className={`absolute z-10 border-2 bg-transparent p-0 cursor-pointer hover:bg-amber-50/20 ${
+                            selectedPredIdx === idx
+                              ? 'border-amber-400 bg-amber-400/15'
+                              : 'border-amber-50'
+                          }`}
                           style={calculateBoxPos(
                             pred.box.x1,
                             pred.box.x2,
@@ -148,7 +146,7 @@ export function TransactionDetailView({
                     />
                   </div>
                 ) : (
-                  <div className="flex items-center justify-center h-64 w-full text-muted-foreground">
+                  <div className="flex items-center justify-center h-64 w-full">
                     No image available for this transaction
                   </div>
                 )}
@@ -168,12 +166,13 @@ export function TransactionDetailView({
                   {transaction.status && (
                     <Badge
                       variant="outline"
-                      className={`capitalize ${transaction.status === 'APPROVED'
-                        ? 'border-green-500/50 text-green-600 bg-green-50'
-                        : transaction.status === 'REJECTED'
-                          ? 'border-red-500/50 text-red-600 bg-red-50'
-                          : 'border-yellow-500/50 text-yellow-600 bg-yellow-50'
-                        }`}
+                      className={`capitalize ${
+                        transaction.status === 'APPROVED'
+                          ? 'border-green-500/50 text-green-600 bg-green-50'
+                          : transaction.status === 'REJECTED'
+                            ? 'border-red-500/50 text-red-600 bg-red-50'
+                            : 'border-yellow-500/50 text-yellow-600 bg-yellow-50'
+                      }`}
                     >
                       {transaction.status.toLowerCase()}
                     </Badge>
@@ -203,21 +202,11 @@ export function TransactionDetailView({
                 <CardContent className="overflow-y-auto flex-1 px-6 pb-4">
                   {selectedPred ? (
                     <div className="space-y-3">
-                      <div className="flex items-center gap-2">
-                        <span className="font-semibold capitalize text-lg">
-                          {selectedPred.name}
-                        </span>
-                        <Badge
-                          variant="outline"
-                          className="font-mono text-xs"
-                        >
-                          {(selectedPred.confidence * 100).toFixed(1)}%
-                        </Badge>
-                      </div>
                       <Table>
                         <TableHeader>
                           <TableRow>
                             <TableHead>Food Item</TableHead>
+
                             <TableHead className="text-right">
                               Mass (g)
                             </TableHead>
@@ -229,6 +218,7 @@ export function TransactionDetailView({
                               <TableCell className="font-medium capitalize">
                                 {selectedPred.name}
                               </TableCell>
+
                               <TableCell className="text-right font-mono">
                                 {selectedPred.mass[0]?.toFixed(2)}g
                               </TableCell>
@@ -239,10 +229,15 @@ export function TransactionDetailView({
                               {selectedPred.mass[selectedPred.class] > 0 && (
                                 <TableRow className="bg-primary/10">
                                   <TableCell className="capitalize font-bold text-primary">
-                                    {classIdNameMap[selectedPred.class] ?? `Class ${selectedPred.class}`}
+                                    {classIdNameMap[selectedPred.class] ??
+                                      `Class ${selectedPred.class}`}
                                   </TableCell>
+
                                   <TableCell className="text-right font-mono font-bold text-primary">
-                                    {selectedPred.mass[selectedPred.class].toFixed(2)}g
+                                    {selectedPred.mass[
+                                      selectedPred.class
+                                    ].toFixed(2)}
+                                    g
                                   </TableCell>
                                 </TableRow>
                               )}
@@ -253,6 +248,7 @@ export function TransactionDetailView({
                                     <TableCell className="capitalize text-muted-foreground">
                                       {classIdNameMap[mIdx] ?? `Class ${mIdx}`}
                                     </TableCell>
+
                                     <TableCell className="text-right font-mono text-muted-foreground">
                                       {m.toFixed(2)}g
                                     </TableCell>
@@ -269,7 +265,9 @@ export function TransactionDetailView({
                       <TableHeader className="sticky top-0 bg-card z-10">
                         <TableRow>
                           <TableHead>Name</TableHead>
-                          <TableHead>Confidence</TableHead>
+                          <TableHead className="text-center">
+                            Confidence
+                          </TableHead>
                           <TableHead className="text-right">
                             {isAgnostic ? 'Mass' : 'Masses'}
                           </TableHead>
@@ -281,13 +279,8 @@ export function TransactionDetailView({
                             <TableCell className="font-medium capitalize">
                               {pred.name}
                             </TableCell>
-                            <TableCell>
-                              <Badge
-                                variant="outline"
-                                className="font-mono text-xs"
-                              >
-                                {(pred.confidence * 100).toFixed(1)}%
-                              </Badge>
+                            <TableCell className="font-mono text-center">
+                              {(pred.confidence * 100).toFixed(1)}%
                             </TableCell>
                             <TableCell className="text-right font-mono text-sm">
                               {isAgnostic ? (
@@ -298,14 +291,15 @@ export function TransactionDetailView({
                                     m > 0 ? (
                                       <span
                                         key={mIdx}
-                                        className={`${mIdx === pred.class
-                                          ? 'font-bold text-primary text-lg'
-                                          : 'text-sm text-muted-foreground'
-                                          }`}
+                                        className={`${
+                                          mIdx === pred.class
+                                            ? 'font-bold text-primary text-lg'
+                                            : 'text-sm text-muted-foreground'
+                                        }`}
                                       >
-                                        {classIdNameMap[mIdx] ?? `Class ${mIdx}`}
+                                        {classIdNameMap[mIdx] ??
+                                          `Class ${mIdx}`}
                                         : {m.toFixed(2)}g
-
                                       </span>
                                     ) : null
                                   )}

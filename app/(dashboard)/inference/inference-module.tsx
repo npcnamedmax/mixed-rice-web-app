@@ -133,9 +133,12 @@ export default function InferenceModule({
         priceInterval: updated.priceInterval,
         name: updated.name
       };
-      groupItems(newItems.filter((e) => e.itemStatus !== 'VENDOR_REMOVED'));
+      const it = groupItems(
+        newItems.filter((e) => e.itemStatus !== 'VENDOR_REMOVED')
+      );
       const input = inputRefs.current[updated.classId];
-      if (input != null) input.value = updated.finalPrice.toString(); // reset the price field
+      if (input != null)
+        input.value = it[updated.classId].finalPrice.toString(); // reset the price field
       return newItems;
     });
     setPriceOverride((prev) => {
@@ -269,7 +272,9 @@ export default function InferenceModule({
                 ? Number(item.predInfo?.mass[0] ?? 0)
                 : Number(item.predInfo?.mass[item.foodId] ?? 0);
             }
+            //console.log('before ', item.foodId, acc[item.foodId].finalPrice);
             acc[item.foodId].finalPrice += Number(item.finalPrice);
+            //console.log('after ', item.foodId, acc[item.foodId].finalPrice);
           }
           return acc;
         },

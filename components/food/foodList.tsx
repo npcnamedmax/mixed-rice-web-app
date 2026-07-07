@@ -50,9 +50,8 @@ export function FoodList({
   };
 
   return (
-    <Card {...props}>
+    <Card {...props} className="flex-1 flex-row">
       <CardHeader>
-        {isLoading && <Loader />}
         <form
           onSubmit={submitSearch}
           className="relative ml-auto flex-1 md:grow-0"
@@ -68,10 +67,9 @@ export function FoodList({
           />
         </form>
       </CardHeader>
-      <CardContent>
-        <div className="overflow-y-auto pr-2 max-h-[60vh]">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            {isLoading && <Loader />}
+      <CardContent className="flex-1">
+        <div className="overflow-y-auto pr-2">
+          <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
             {foodItems.map((i: foodItemType) => (
               <Card
                 key={i.id}
@@ -82,8 +80,8 @@ export function FoodList({
                   <Image
                     alt={i.name || 'Product image'}
                     className="aspect-square rounded-md object-cover"
-                    height={256}
-                    width={256}
+                    height={200}
+                    width={200}
                     src={
                       i.imageUrl ||
                       'https://t4.ftcdn.net/jpg/06/71/92/37/360_F_671923740_x0zOL3OIuUAnSF6sr7PuznCI5bQFKhI0.jpg'
@@ -101,6 +99,9 @@ export function FoodList({
           </div>
         </div>
       </CardContent>
+      <CardFooter className="flex justify-center items-center">
+        {isLoading && <Loader />}
+      </CardFooter>
     </Card>
   );
 }

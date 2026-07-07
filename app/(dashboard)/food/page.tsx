@@ -18,8 +18,8 @@ export default async function FoodItemsPage(props: {
   );
 
   return (
-    <Tabs defaultValue="all">
-      <TabsContent value="all">
+    <Tabs defaultValue="all" className="flex-1 flex">
+      <TabsContent value="all" className="flex-1 flex">
         <FoodItemEditModule
           initFoodItems={foodItems}
           initNewOffset={newOffset}

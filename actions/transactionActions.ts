@@ -8,9 +8,7 @@ import { getFoodItems } from '@/lib/db';
 const BUCKET_NAME = 'prediction_info';
 
 export async function getClassIdNameMap(): Promise<Record<number, string>> {
-  const { foodItems } = await dbRunner((db) =>
-    getFoodItems(db, '', 0, 1000)
-  );
+  const { foodItems } = await dbRunner((db) => getFoodItems(db, '', 0, 1000));
   const map: Record<number, string> = {};
   for (const item of foodItems) {
     map[item.classId] = item.name;

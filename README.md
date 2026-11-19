@@ -1,68 +1,87 @@
-<div align="center"><strong>Next.js 15 Admin Dashboard Template</strong></div>
-<div align="center">Built with the Next.js App Router</div>
-<br />
-<div align="center">
-<a href="https://next-admin-dash.vercel.app/">Demo</a>
-<span> · </span>
-<a href="https://vercel.com/templates/next.js/admin-dashboard-tailwind-postgres-react-nextjs">Clone & Deploy</a>
-<span>
-</div>
+# Mix Rice Detection and Pricing Web App
 
-## Overview
+This system takes a photo of a plate, detects and estimates the mass of each food item on it and prices the plate via a customizable price per mass ruleset. The vendor then reviews the result before checkout.
 
-![Anurag's GitHub stats](https://github-readme-stats.vercel.app/api?username=npcnamedmax&theme=foobar)
+Final Year Project, Multimedia University (Grade A), Best Presenter Award, CITIC 2026
 
-![Gist Card](https://github-readme-stats.vercel.app/api/gist?id=c3613af421d6df41d09eed9fbdad586d)
+![Inference Screen](readme_assets/inferenceScreen.png)
+*Figure 1 Inference Screen*
 
-This is a starter template using the following stack:
+![Edit food class](readme_assets/editFoodClass.png)
+*Figure 2 Edit Food Class for Channel-Specific Models*
 
-- Framework - [Next.js (App Router)](https://nextjs.org)
-- Language - [TypeScript](https://www.typescriptlang.org)
-- Auth - [Auth.js](https://authjs.dev)
-- Database - [Postgres](https://vercel.com/postgres)
-- Deployment - [Vercel](https://vercel.com/docs/concepts/next.js/overview)
-- Styling - [Tailwind CSS](https://tailwindcss.com)
-- Components - [Shadcn UI](https://ui.shadcn.com/)
-- Analytics - [Vercel Analytics](https://vercel.com/analytics)
-- Formatting - [Prettier](https://prettier.io)
+![alt text](readme_assets/transactionList.png)
+*Figure 3 Transaction History*
 
-This template uses the new Next.js App Router. This includes support for enhanced layouts, colocation of components, tests, and styles, component-level data fetching, and more.
+![alt text](readme_assets/transactionDetail.png)
+*Figure 4 Transaction Detail*
 
-## Getting Started
+## How It Works
+![High level architecture](readme_assets/architecture.png)
 
-During the deployment, Vercel will prompt you to create a new Postgres database. This will add the necessary environment variables to your project.
+## Repositories
+| Repository | What it contains |
+|---|---|
+| mixed-rice-web-app (this repo) | Next.js dashboard for inference, price management and transactions viewing |
+| [mixed-rice-inference-api](https://github.com/npcnamedmax/mixed-rice-inference-api) | FastAPI router that sends each request to the respective model server |
+| [mixed-rice-detection-models](https://github.com/npcnamedmax/mixed-rice-detection-models) | mass-regression heads, custom loss and metrics, training |
+| [datasetv1](https://github.com/npcnamedmax/datasetv1) | 14 food classes, bounding boxes plus mass labels |
 
-Inside the Vercel Postgres dashboard, create a table based on the schema defined in this repository.
+## Features
+- Allow inference using 6 different models/configurations, including YOLOv11, YOLOv12 and RT-DETR, each in channel-specific and channel-agnostic versions.
+- Each detected item shows its bounding box, confidence, predicted mass and price.
+- Allows vendors to change the inference items' prices, food types and/or add/remove food items.
+- Automated pricing based on mass, and is customizable and versioned instead of overwritten when modified.
+- Each transaction is recorded with the model used, original image and prediction JSON, and is marked approved or rejected.
 
-```sql
-CREATE TYPE status AS ENUM ('active', 'inactive', 'archived');
+## Results
+**Table 1** Channel-specific models
 
-CREATE TABLE products (
-  id SERIAL PRIMARY KEY,
-  image_url TEXT NOT NULL,
-  name TEXT NOT NULL,
-  status status NOT NULL,
-  price NUMERIC(10, 2) NOT NULL,
-  stock INTEGER NOT NULL,
-  available_at TIMESTAMP NOT NULL
-);
-```
+| Metric        | YOLOv11-l | YOLOv12-l | RT-DETR-l |
+|---------------|:---------:|:---------:|:---------:|
+| Precision     | 93.67%    | 93.17%    | 92.76%    |
+| Recall        | 84.85%    | 86.55%    | 89.33%    |
+| F1-score      | 89.04%    | 89.74%    | 91.01%    |
+| mAP<sub>50</sub>    | 93.02%    | 92.81%    | 91.24%    |
+| mAP<sub>50-95</sub> | 87.33%    | 86.03%    | 81.54%    |
+| Mass MAE (g)  | 14.13     | 15.32     | 13.26     |
+| Latency (ms)  | 32.8      | 47.3      | 40.9      |
 
-Then, uncomment `app/api/seed.ts` and hit `http://localhost:3000/api/seed` to seed the database with products.
+**Table 2** Channel-agnostic models
 
-Next, copy the `.env.example` file to `.env` and update the values. Follow the instructions in the `.env.example` file to set up your GitHub OAuth application.
+| Metric        | YOLOv11-l | YOLOv12-l | RT-DETR-l |
+|---------------|:---------:|:---------:|:---------:|
+| Precision     | 90.77%    | 91.54%    | 92.72%    |
+| Recall        | 88.54%    | 88.76%    | 87.03%    |
+| F1-score      | 89.64%    | 90.13%    | 89.78%    |
+| mAP<sub>50</sub>    | 93.27%    | 92.90%    | 90.06%    |
+| mAP<sub>50-95</sub> | 86.30%    | 87.09%    | 80.76%    |
+| Mass MAE (g)  | 16.01     | 14.84     | 12.91     |
+| Latency (ms)  | 33.5      | 48.4      | 45.6      |
 
+## Tech stack
+Next.js 15, React 19, TypeScript, Tailwind CSS, shadcn/ui, Auth.js, Drizzle ORM, PostgreSQL (Supabase), Supabase Storage, FastAPI, Python, PyTorch, Ultralytics
+
+## Database
+![alt text](readme_assets/db.jpeg)
+*Figure 5 Database Schema*
+
+## Running locally
 ```bash
-npm i -g vercel
-vercel link
-vercel env pull
+git clone git@github.com:npcnamedmax/mix-rice-web-app.git
+cd mix-rice-web-app
+npm install
+cp .env.example .env
+npx drizzle-kit push
+npm run dev
 ```
 
-Finally, run the following commands to start the development server:
+Open http://localhost:3000
 
-```bash
-pnpm install
-pnpm dev
-```
+## Limitations
+- This is a prototype, not production ready.
+- Inference router URL is hard coded to localhost:8000
+- No automated tests
 
-You should now be able to access the application at http://localhost:3000.
+## License
+MIT. See LICENSE.md

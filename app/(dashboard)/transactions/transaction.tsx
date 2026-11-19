@@ -39,7 +39,7 @@ export function Transaction({
           {transactionItem.status}
         </Badge>
       </TableCell>
-      <TableCell className="hidden md:table-cell">{`$${transactionItem.totalPrice}`}</TableCell>
+      <TableCell className="hidden md:table-cell">{`RM ${transactionItem.totalPrice}`}</TableCell>
       <TableCell className="hidden md:table-cell">{`${transactionItem.model_type}`}</TableCell>
       <TableCell className="hidden md:table-cell">
         {transactionItem.createdAt.toDateString()}

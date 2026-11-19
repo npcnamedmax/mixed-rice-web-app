@@ -404,7 +404,7 @@ export default function InferenceModule({
                         <TableRow>
                           <TableHead>Name</TableHead>
                           <TableHead className="hidden md:table-cell">
-                            Rate
+                            Rate (RM)
                           </TableHead>
                           <TableHead className="hidden md:table-cell w-20">
                             Mass
@@ -422,7 +422,7 @@ export default function InferenceModule({
                               {g.name}
                             </TableCell>
                             <TableCell className="hidden md:table-cell text-muted-foreground text-xs font-mono">
-                              ${Number(g.stepPrice).toFixed(2)}/
+                              {Number(g.stepPrice).toFixed(2)}/
                               {g.priceInterval}g
                             </TableCell>
                             <TableCell className="hidden md:table-cell text-sm text-foreground/80 font-medium">
@@ -432,7 +432,7 @@ export default function InferenceModule({
                             </TableCell>
                             <TableCell className="text-right">
                               <div className="flex items-center justify-end font-mono font-bold text-primary">
-                                $
+                                RM 
                                 <form
                                   onSubmit={(e) => {
                                     e.preventDefault(); // Prevents the page from reloading
@@ -495,7 +495,7 @@ export default function InferenceModule({
                         Total Amount
                       </span>
                       <span className="text-3xl font-mono font-extrabold text-primary drop-shadow-sm">
-                        $
+                        RM 
                         {groupedItems
                           .reduce((total, group) => {
                             const groupCost = Number(group.finalPrice);

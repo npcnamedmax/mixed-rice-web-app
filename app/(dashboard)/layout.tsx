@@ -27,7 +27,6 @@ import {
   TooltipContent,
   TooltipTrigger
 } from '@/components/ui/tooltip';
-import { User } from './user';
 import { VercelLogo } from '@/components/icons';
 import Providers from './providers';
 import { NavItem } from './nav-item';
@@ -45,7 +44,7 @@ export default function DashboardLayout({
           <header className="sticky top-0 z-30 flex h-14 items-center gap-4 border-b bg-background/80 backdrop-blur-md px-4 sm:static sm:h-auto sm:border-0 sm:bg-transparent sm:px-6">
             <MobileNav />
             <DashboardBreadcrumb />
-            <User />
+            
           </header>
           <main className="flex flex-1 flex-col gap-2 p-4 sm:px-6 sm:py-0 md:gap-4">
             {children}

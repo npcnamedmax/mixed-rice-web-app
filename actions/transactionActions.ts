@@ -4,8 +4,9 @@ import { createClient } from '@supabase/supabase-js';
 import { PredResponseType } from './inferenceActions';
 import { dbRunner } from '@/lib/dbClient';
 import { getFoodItems } from '@/lib/db';
+import { BUCKET_NAME } from '@/lib/config';
 
-const BUCKET_NAME = 'prediction_info';
+
 
 export async function getClassIdNameMap(): Promise<Record<number, string>> {
   const { foodItems } = await dbRunner((db) => getFoodItems(db, '', 0, 1000));

@@ -1,5 +1,5 @@
 import { hostname } from 'os';
-
+const supabaseHost = new URL(process.env.NEXT_PUBLIC_SUPABASE_URL!).hostname;
 export default {
   experimental: {
     serverActions: {
@@ -28,7 +28,7 @@ export default {
       },
       {
         protocol: 'https',
-        hostname: 'ckjejxhukysuuzhjxsvo.supabase.co'
+        hostname: supabaseHost
       }
     ]
   }

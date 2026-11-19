@@ -13,6 +13,7 @@ import {
   TransactionItemView
 } from '../app/(dashboard)/inference/inference-module';
 import { ModelEnumType } from '@/lib/schema';
+import { BUCKET_NAME, TMP_PREFIX, TRANSACTED_PREFIX, INFERENCE_API_URL } from '@/lib/config';
 
 export type PredResponseType = {
   name: string;
@@ -39,11 +40,11 @@ export const getPrediction = async (
     process.env.NEXT_PUBLIC_SUPABASE_URL,
     process.env.SUPABASE_SECRET_KEY
   );
-  const filePath = `tmp/${fileName}`;
-  const bucketName = 'prediction_info';
+  const filePath = `${TMP_PREFIX}${fileName}`;
+  
   const linkPref = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public`;
   const { error, data } = await supabase.storage
-    .from(bucketName)
+    .from(BUCKET_NAME)
     .upload(filePath, file, {
       cacheControl: '3600',
       upsert: true
@@ -54,7 +55,7 @@ export const getPrediction = async (
   console.log(data);
   try {
     const res = await axios.post<PredResponseType[]>(
-      'http://localhost:8000/inference',
+      INFERENCE_API_URL,
       {
         imgUrl: `${linkPref}/${data.fullPath}`,
         model: selectedModel
@@ -62,7 +63,7 @@ export const getPrediction = async (
     );
     if (!res.data) throw new Error('No response data');
     const { error: JSONError } = await supabase.storage
-      .from(bucketName)
+      .from(BUCKET_NAME)
       .upload(`tmp/${fileName.split('.')[0]}.json`, JSON.stringify(res.data), {
         cacheControl: '3600',
         upsert: true
@@ -139,17 +140,16 @@ export const saveTransactionToDb = async (
     process.env.NEXT_PUBLIC_SUPABASE_URL,
     process.env.SUPABASE_SECRET_KEY
   );
-  const bucketName = 'prediction_info';
   const jsonFileName = (fileName && `${fileName.split('.')[0]}.json`) || null;
   if (fileName) {
     // Move file first
     try {
       await supabase.storage
-        .from(bucketName)
-        .move(`tmp/${fileName}`, `transacted/${fileName}`);
+        .from(BUCKET_NAME)
+        .move(`tmp/${fileName}`, `${TRANSACTED_PREFIX}${fileName}`);
       await supabase.storage
-        .from(bucketName)
-        .move(`tmp/${jsonFileName}`, `transacted/${jsonFileName}`);
+        .from(BUCKET_NAME)
+        .move(`tmp/${jsonFileName}`, `${TRANSACTED_PREFIX}${jsonFileName}`);
     } catch (err) {
       console.error('Failed to move file', err);
       throw err;
